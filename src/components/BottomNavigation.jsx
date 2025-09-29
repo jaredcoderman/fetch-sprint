@@ -1,18 +1,25 @@
 import React from 'react'
+import { Link, useLocation } from 'react-router-dom'
 
 function BottomNavigation() {
+  const location = useLocation()
+  
   const navItems = [
-    { icon: '🏠', label: 'Home', active: true },
-    { icon: '🏪', label: 'Store' },
-    { icon: '📷', label: 'Camera', hasBadge: true },
-    { icon: '📋', label: 'Checklist' },
-    { icon: '🎵', label: 'Music' }
+    { icon: '🏠', label: 'Home', path: '/', active: location.pathname === '/' },
+    { icon: '🏪', label: 'Store', path: '/store' },
+    { icon: '📷', label: 'Camera', path: '/camera', hasBadge: true },
+    { icon: '📋', label: 'Checklist', path: '/checklist' },
+    { icon: '🎵', label: 'Music', path: '/music' }
   ]
 
   return (
     <nav className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-200 flex justify-around py-3 shadow-lg">
       {navItems.map((item, index) => (
-        <div key={index} className="flex flex-col items-center gap-1 cursor-pointer">
+        <Link 
+          key={index} 
+          to={item.path} 
+          className="flex flex-col items-center gap-1 cursor-pointer"
+        >
           <div className={`text-2xl ${item.active ? 'text-blue-500' : 'text-gray-500'} ${item.hasBadge ? 'relative' : ''}`}>
             {item.icon}
             {item.hasBadge && (
@@ -21,7 +28,7 @@ function BottomNavigation() {
               </span>
             )}
           </div>
-        </div>
+        </Link>
       ))}
     </nav>
   )

@@ -1,11 +1,13 @@
 import React from 'react'
+import { Routes, Route } from 'react-router-dom'
 import Header from './components/Header'
 import SearchBar from './components/SearchBar'
 import ContentSection from './components/ContentSection'
 import ReferralBanner from './components/ReferralBanner'
 import BottomNavigation from './components/BottomNavigation'
+import TestPage from './components/TestPage'
 
-function App() {
+function HomePage() {
   const forYouProducts = [
     {
       image: "M&M's Image",
@@ -46,6 +48,15 @@ function App() {
       <ContentSection title="Trending offers" products={trendingProducts} />
       <BottomNavigation />
     </div>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/test" element={<TestPage />} />
+    </Routes>
   )
 }
 
