@@ -18,7 +18,6 @@ function Header() {
           <span className="text-yellow-600">$</span>
           <span>20,091</span>
         </div>
-        <div className="text-pink-500 font-bold">♥ 16</div>
       </div>
     </header>
   )
