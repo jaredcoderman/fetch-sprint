@@ -5,7 +5,8 @@ import SearchBar from './components/SearchBar'
 import ContentSection from './components/ContentSection'
 import ReferralBanner from './components/ReferralBanner'
 import BottomNavigation from './components/BottomNavigation'
-import TestPage from './components/TestPage'
+import TestPage from './TestPage'
+import Checklists from './Checklists'
 
 function HomePage() {
   const forYouProducts = [
@@ -56,6 +57,7 @@ function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/test" element={<TestPage />} />
+      <Route path="/checklists" element={<Checklists />} />
     </Routes>
   )
 }
