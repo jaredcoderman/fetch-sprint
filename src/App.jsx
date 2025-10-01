@@ -5,8 +5,11 @@ import SearchBar from './components/SearchBar'
 import ContentSection from './components/ContentSection'
 import ReferralBanner from './components/ReferralBanner'
 import BottomNavigation from './components/BottomNavigation'
-import TestPage from './TestPage'
 import Checklists from './Checklists'
+import MyChecklists from './MyChecklists'
+import ChecklistShow from './ChecklistShow'
+import AllChecklists from './AllChecklists'
+import AllChecklistsShow from './AllChecklistsShow'
 
 function HomePage() {
   const forYouProducts = [
@@ -56,8 +59,11 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/test" element={<TestPage />} />
       <Route path="/checklists" element={<Checklists />} />
+      <Route path="/my-checklists" element={<MyChecklists />} />
+      <Route path="/checklist-show" element={<ChecklistShow />} />
+      <Route path="/all-checklists" element={<AllChecklists />} />
+      <Route path="/all-checklists-show" element={<AllChecklistsShow />} />
     </Routes>
   )
 }

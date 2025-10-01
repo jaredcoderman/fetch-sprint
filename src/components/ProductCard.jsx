@@ -7,10 +7,15 @@ function ProductCard({ image, points, title }) {
         {image}
       </div>
       <div className="p-3">
-        <div className="flex items-center gap-1 mb-2">
-          <span className="text-yellow-600 font-bold">$</span>
-          <span>{points}</span>
-          <span className="text-pink-500 font-bold">♥</span>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1">
+            <span className="text-yellow-600 font-bold">$</span>
+            <span className="text-yellow-600 font-bold">$</span>
+            <span className="font-bold">{points}</span>
+          </div>
+          <button className="w-6 h-6 bg-black rounded-full flex items-center justify-center text-white text-sm font-bold hover:bg-gray-800 transition-colors">
+            +
+          </button>
         </div>
         <p className="text-sm text-gray-800 leading-tight">{title}</p>
       </div>

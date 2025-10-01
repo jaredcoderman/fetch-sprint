@@ -1,21 +1,18 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React from "react";
 import ContentSection from "./components/ContentSection";
 import BottomNavigation from "./components/BottomNavigation";
 
-function Checklists() {
-  const [activeFilter, setActiveFilter] = useState("my");
-
-  const movieNightProducts = [
+function AllChecklists() {
+  const avasMovieNightProducts = [
     {
       image: "M&M's Peanut Butter Chocolate Candy",
       points: "1,200",
-      title: "M&M's Peanut Butter Chocolate Candy",
+      title: "M&M's Peanut Butter Chocolate Candy @ Walmart",
     },
     {
       image: "TWIX Ice Cream Bars",
       points: "800",
-      title: "TWIX bars",
+      title: "TWIX bars @CVS",
     },
     {
       image: "Popcorn",
@@ -24,16 +21,16 @@ function Checklists() {
     },
   ];
 
-  const dormEssentialsProducts = [
+  const tomsDormEssentialsProducts = [
     {
       image: "Brita Pitchers OR Dispensers",
       points: "3,000",
-      title: "Brita Pitchers OR Dispensers",
+      title: "Brita Pitchers OR Dispensers @ Target",
     },
     {
       image: "SleepRight Full Size Pillows",
       points: "25,000",
-      title: "SleepRight Full Size Pillows at Sleepright.com",
+      title: "SleepRight Full Size Pillows at Sleepright.com @ Target",
     },
     {
       image: "Dorm Bedding Set",
@@ -42,7 +39,7 @@ function Checklists() {
     },
   ];
 
-  const gameDayProducts = [
+  const jamesGameDayProducts = [
     {
       image: "Corn Nuts Original",
       points: "900",
@@ -62,14 +59,17 @@ function Checklists() {
 
   return (
     <div className="max-w-sm mx-auto bg-white min-h-screen relative pb-20">
-      {/* Custom Header for Checklists */}
+      {/* Header */}
       <header className="flex justify-between items-center px-4 pt-5 pb-4 bg-white">
         <h1 className="text-3xl font-serif font-bold text-gray-800">
-          Checklists
+          All Checklists
         </h1>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
-            ▶
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
+              🎮
+            </div>
+            <span className="text-blue-500 font-medium text-sm">Play</span>
           </div>
           <div className="bg-yellow-400 px-3 py-1.5 rounded-full flex items-center gap-1 font-bold text-gray-800">
             <span className="text-yellow-600">$</span>
@@ -79,40 +79,26 @@ function Checklists() {
         </div>
       </header>
 
-      {/* Filter Buttons */}
-      <div className="px-4 pb-4">
-        <div className="flex gap-2">
-          <Link
-            to="/my-checklists"
-            className="px-4 py-2 rounded-full font-medium text-sm transition-colors bg-gradient-to-r from-blue-500 to-blue-300 text-white"
-          >
-            My Checklists
-          </Link>
-          <Link
-            to="/all-checklists"
-            className="px-4 py-2 rounded-full font-medium text-sm transition-colors bg-orange-500 text-white"
-          >
-            All Checklists
-          </Link>
-        </div>
-      </div>
-
       {/* Content Sections */}
       <ContentSection
-        title="Movie night"
+        title="Ava's Movie night"
         emoji="🎬"
-        products={movieNightProducts}
+        products={avasMovieNightProducts}
       />
       <ContentSection
-        title="Dorm Essentials"
+        title="Tom's Dorm Essentials"
         emoji="🏠"
-        products={dormEssentialsProducts}
+        products={tomsDormEssentialsProducts}
       />
-      <ContentSection title="Game Day" emoji="🏈" products={gameDayProducts} />
+      <ContentSection
+        title="James' Game Day"
+        emoji="🏈"
+        products={jamesGameDayProducts}
+      />
 
       <BottomNavigation />
     </div>
   );
 }
 
-export default Checklists;
+export default AllChecklists;

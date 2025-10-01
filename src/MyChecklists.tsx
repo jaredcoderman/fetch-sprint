@@ -1,11 +1,8 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React from "react";
 import ContentSection from "./components/ContentSection";
 import BottomNavigation from "./components/BottomNavigation";
 
-function Checklists() {
-  const [activeFilter, setActiveFilter] = useState("my");
-
+function MyChecklists() {
   const movieNightProducts = [
     {
       image: "M&M's Peanut Butter Chocolate Candy",
@@ -13,14 +10,9 @@ function Checklists() {
       title: "M&M's Peanut Butter Chocolate Candy",
     },
     {
-      image: "TWIX Ice Cream Bars",
-      points: "800",
-      title: "TWIX bars",
-    },
-    {
-      image: "Popcorn",
-      points: "600",
-      title: "Movie Theater Popcorn",
+      image: "Butterfinger Marshmallow",
+      points: "500 per $1",
+      title: "Butterfinger Marshmallow",
     },
   ];
 
@@ -35,11 +27,6 @@ function Checklists() {
       points: "25,000",
       title: "SleepRight Full Size Pillows at Sleepright.com",
     },
-    {
-      image: "Dorm Bedding Set",
-      points: "15,000",
-      title: "Complete Dorm Bedding Set",
-    },
   ];
 
   const gameDayProducts = [
@@ -53,23 +40,21 @@ function Checklists() {
       points: "1,200",
       title: "M&M's Peanut Butter",
     },
-    {
-      image: "Sports Drinks",
-      points: "1,500",
-      title: "Sports Energy Drinks",
-    },
   ];
 
   return (
     <div className="max-w-sm mx-auto bg-white min-h-screen relative pb-20">
-      {/* Custom Header for Checklists */}
+      {/* Custom Header for My Checklists */}
       <header className="flex justify-between items-center px-4 pt-5 pb-4 bg-white">
         <h1 className="text-3xl font-serif font-bold text-gray-800">
-          Checklists
+          My Checklists
         </h1>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
-            ▶
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
+              ▶
+            </div>
+            <span className="text-blue-500 font-medium text-sm">Play</span>
           </div>
           <div className="bg-yellow-400 px-3 py-1.5 rounded-full flex items-center gap-1 font-bold text-gray-800">
             <span className="text-yellow-600">$</span>
@@ -79,40 +64,29 @@ function Checklists() {
         </div>
       </header>
 
-      {/* Filter Buttons */}
-      <div className="px-4 pb-4">
-        <div className="flex gap-2">
-          <Link
-            to="/my-checklists"
-            className="px-4 py-2 rounded-full font-medium text-sm transition-colors bg-gradient-to-r from-blue-500 to-blue-300 text-white"
-          >
-            My Checklists
-          </Link>
-          <Link
-            to="/all-checklists"
-            className="px-4 py-2 rounded-full font-medium text-sm transition-colors bg-orange-500 text-white"
-          >
-            All Checklists
-          </Link>
-        </div>
-      </div>
-
       {/* Content Sections */}
       <ContentSection
         title="Movie night"
         emoji="🎬"
+        heartCount="102"
         products={movieNightProducts}
       />
       <ContentSection
         title="Dorm Essentials"
         emoji="🏠"
+        heartCount="243"
         products={dormEssentialsProducts}
       />
-      <ContentSection title="Game Day" emoji="🏈" products={gameDayProducts} />
+      <ContentSection
+        title="Game Day"
+        emoji="🏈"
+        heartCount="432"
+        products={gameDayProducts}
+      />
 
       <BottomNavigation />
     </div>
   );
 }
 
-export default Checklists;
+export default MyChecklists;

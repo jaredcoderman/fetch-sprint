@@ -7,8 +7,8 @@ function BottomNavigation() {
   const navItems = [
     { icon: '🏠', label: 'Home', path: '/', active: location.pathname === '/' },
     { icon: '🏪', label: 'Store', path: '/store' },
-    { icon: '📷', label: 'Camera', path: '/camera', hasBadge: true },
-    { icon: '📋', label: 'Checklist', path: '/checklist' },
+    { icon: '📷', label: 'Camera', path: '/camera', hasBadge: true, active: location.pathname === '/checklist-show' || location.pathname === '/all-checklists' || location.pathname === '/all-checklists-show' },
+    { icon: '📋', label: 'Checklist', path: '/checklists', active: location.pathname === '/checklists' || location.pathname === '/my-checklists' },
     { icon: '🎵', label: 'Music', path: '/music' }
   ]
 
