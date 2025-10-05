@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, increment } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
+import { processReceiptImage, validateReceiptImage } from '../utils/receiptOCR';
 
 function TeamDashboard() {
   const { id } = useParams();
@@ -19,6 +20,9 @@ function TeamDashboard() {
   const [uploadAmount, setUploadAmount] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [ocrData, setOcrData] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
 
   useEffect(() => {
     loadTeamData();
@@ -53,9 +57,54 @@ function TeamDashboard() {
     setLoading(false);
   }
 
+  async function handleFileSelect(file) {
+    if (!file) return;
+
+    try {
+      // Validate file
+      validateReceiptImage(file);
+      
+      setUploadFile(file);
+      
+      // Create preview
+      const preview = URL.createObjectURL(file);
+      setPreviewUrl(preview);
+      
+      // Check if OpenAI is configured
+      const apiKey = localStorage.getItem('openai_api_key');
+      if (!apiKey) {
+        alert('⚠️ OpenAI API key not configured. Please go to Settings to set up automatic receipt processing.');
+        return;
+      }
+      
+      // Process receipt with OCR
+      setProcessing(true);
+      try {
+        const result = await processReceiptImage(file);
+        setOcrData(result);
+        setUploadAmount(result.amount.toFixed(2));
+        setUploadDescription(result.storeName || '');
+        alert(`✓ Receipt processed! Total found: $${result.amount.toFixed(2)}`);
+      } catch (ocrError) {
+        console.error('OCR Error:', ocrError);
+        alert(`⚠️ Could not read receipt automatically: ${ocrError.message}\n\nYou can still enter the amount manually, but it may require admin approval.`);
+      } finally {
+        setProcessing(false);
+      }
+    } catch (err) {
+      alert(err.message);
+      setUploadFile(null);
+    }
+  }
+
   async function handleUploadReceipt() {
-    if (!uploadFile || !uploadAmount) {
-      alert('Please select a file and enter the receipt amount');
+    if (!uploadFile) {
+      alert('Please select a receipt image');
+      return;
+    }
+
+    if (!uploadAmount) {
+      alert('Please wait for OCR processing or enter the amount manually');
       return;
     }
 
@@ -86,30 +135,51 @@ function TeamDashboard() {
         amount,
         points,
         description: uploadDescription,
+        storeName: ocrData?.storeName || uploadDescription,
+        ocrVerified: !!ocrData,
+        ocrConfidence: ocrData?.confidence || 'manual',
         createdAt: new Date().toISOString(),
-        status: 'approved' // In production, you might want manual approval
+        status: ocrData ? 'approved' : 'pending' // Auto-approve if OCR verified
       });
 
-      // Update team points
-      await updateDoc(doc(db, 'teams', id), {
-        totalPoints: increment(points),
-        receiptsCount: increment(1)
-      });
+      // Update team points (only if OCR verified or approved)
+      if (ocrData) {
+        await updateDoc(doc(db, 'teams', id), {
+          totalPoints: increment(points),
+          receiptsCount: increment(1)
+        });
+      }
 
       // Reset form
-      setShowUploadModal(false);
-      setUploadFile(null);
-      setUploadAmount('');
-      setUploadDescription('');
+      handleCloseModal();
       
       // Reload data
       loadTeamData();
+      
+      if (ocrData) {
+        alert('✓ Receipt uploaded and points added!');
+      } else {
+        alert('✓ Receipt uploaded! Awaiting admin approval for points.');
+      }
     } catch (err) {
       console.error('Error uploading receipt:', err);
       alert('Failed to upload receipt. Please try again.');
     }
 
     setUploading(false);
+  }
+
+  function handleCloseModal() {
+    setShowUploadModal(false);
+    setUploadFile(null);
+    setUploadAmount('');
+    setUploadDescription('');
+    setOcrData(null);
+    setProcessing(false);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
   }
 
   if (loading) {
@@ -205,13 +275,33 @@ function TeamDashboard() {
                     type="file"
                     accept="image/*"
                     capture="environment"
-                    onChange={(e) => setUploadFile(e.target.files[0])}
+                    onChange={(e) => handleFileSelect(e.target.files[0])}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    disabled={processing}
                   />
-                  {uploadFile && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      Selected: {uploadFile.name}
-                    </p>
+                  {processing && (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                        <p className="text-sm text-blue-800">Processing receipt with AI...</p>
+                      </div>
+                    </div>
+                  )}
+                  {previewUrl && (
+                    <div className="mt-3">
+                      <img 
+                        src={previewUrl} 
+                        alt="Receipt preview" 
+                        className="max-h-48 rounded-lg border border-gray-300"
+                      />
+                    </div>
+                  )}
+                  {ocrData && (
+                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-800">
+                        ✓ Receipt verified! Store: {ocrData.storeName} | Confidence: {ocrData.confidence}
+                      </p>
+                    </div>
                   )}
                 </div>
 
@@ -226,10 +316,17 @@ function TeamDashboard() {
                     onChange={(e) => setUploadAmount(e.target.value)}
                     placeholder="0.00"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    disabled={processing}
+                    readOnly={!!ocrData}
                   />
                   {uploadAmount && (
                     <p className="text-sm text-indigo-600 mt-2">
                       Points: {Math.floor(parseFloat(uploadAmount || 0) * 100)}
+                    </p>
+                  )}
+                  {!ocrData && uploadAmount && (
+                    <p className="text-xs text-yellow-600 mt-2">
+                      ⚠️ Manual entry - requires admin approval
                     </p>
                   )}
                 </div>
@@ -249,9 +346,24 @@ function TeamDashboard() {
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800">
-                    <strong>Point System:</strong> $1 = 100 points
+                    <strong>Point System:</strong> $1 = 100 points<br/>
+                    <strong>AI Verification:</strong> Receipts are automatically verified using GPT-4 Vision
                   </p>
                 </div>
+
+                {!localStorage.getItem('openai_api_key') && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-sm text-yellow-800">
+                      ⚠️ <strong>OCR not configured:</strong>{' '}
+                      <button
+                        onClick={() => navigate('/settings')}
+                        className="text-indigo-600 hover:text-indigo-700 underline"
+                      >
+                        Set up automatic receipt verification
+                      </button>
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 mt-6">
@@ -263,13 +375,8 @@ function TeamDashboard() {
                   {uploading ? 'Uploading...' : 'Upload'}
                 </button>
                 <button
-                  onClick={() => {
-                    setShowUploadModal(false);
-                    setUploadFile(null);
-                    setUploadAmount('');
-                    setUploadDescription('');
-                  }}
-                  disabled={uploading}
+                  onClick={handleCloseModal}
+                  disabled={uploading || processing}
                   className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50"
                 >
                   Cancel

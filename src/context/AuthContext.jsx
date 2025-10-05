@@ -8,6 +8,7 @@ import {
   signInWithPopup
 } from 'firebase/auth';
 import { auth } from '../firebase';
+import { initializeOpenAI } from '../utils/receiptOCR';
 
 const AuthContext = createContext();
 
@@ -41,6 +42,12 @@ export function AuthProvider({ children }) {
       setCurrentUser(user);
       setLoading(false);
     });
+
+    // Initialize OpenAI if API key is saved
+    const apiKey = localStorage.getItem('openai_api_key');
+    if (apiKey) {
+      initializeOpenAI(apiKey);
+    }
 
     return unsubscribe;
   }, []);

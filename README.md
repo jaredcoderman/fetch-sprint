@@ -8,9 +8,11 @@ A competitive receipt scanning app where teams compete to earn points by uploadi
 - 🏆 **Competitions** - Create and join multiple competitions
 - 👥 **Teams** - Form teams and compete together
 - 📸 **Receipt Scanning** - Upload receipt images and earn points
+- 🤖 **AI-Powered OCR** - Automatic receipt verification using GPT-4 Vision (prevents fraud!)
 - 📊 **Real-time Leaderboards** - Track team rankings live
 - 💯 **Point System** - Automatic calculation ($1 = 100 points)
 - 🎯 **Clean UI** - Modern, responsive design with Tailwind CSS
+- ⚙️ **Settings** - Configure OCR and manage account
 
 ## Tech Stack 🛠️
 
@@ -121,6 +123,16 @@ A competitive receipt scanning app where teams compete to earn points by uploadi
    ```
 
    Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+7. **Set up OpenAI for Receipt OCR** (Optional but recommended)
+   
+   For automatic receipt verification:
+   - Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+   - Log into the app
+   - Go to Settings → Add your OpenAI API key
+   - Now receipts will be automatically verified!
+   
+   See `RECEIPT_OCR_SETUP.md` for detailed instructions.
 
 ## Usage Guide 📖
 

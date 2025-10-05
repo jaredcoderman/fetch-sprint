@@ -44,6 +44,12 @@ function Competitions() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-indigo-600">Receipt Sprint</h1>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/settings')}
+              className="text-gray-600 hover:text-gray-900 flex items-center gap-1"
+            >
+              ⚙️ Settings
+            </button>
             <span className="text-gray-600">{currentUser?.email}</span>
             <button
               onClick={handleLogout}

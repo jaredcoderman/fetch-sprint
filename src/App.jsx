@@ -6,6 +6,7 @@ import Competitions from './pages/Competitions'
 import CompetitionDetail from './pages/CompetitionDetail'
 import TeamDashboard from './pages/TeamDashboard'
 import CreateCompetition from './pages/CreateCompetition'
+import Settings from './pages/Settings'
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -150,6 +151,7 @@ function App() {
         <Route path="/competition/:id" element={<CompetitionDetail />} />
         <Route path="/team/:id" element={<TeamDashboard />} />
         <Route path="/create-competition" element={<CreateCompetition />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </AuthProvider>
   )
