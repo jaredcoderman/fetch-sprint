@@ -23,6 +23,7 @@ function TeamDashboard() {
   const [processing, setProcessing] = useState(false);
   const [ocrData, setOcrData] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [memberStats, setMemberStats] = useState([]);
 
   useEffect(() => {
     loadTeamData();
@@ -51,10 +52,37 @@ function TeamDashboard() {
         ...doc.data()
       }));
       setReceipts(receiptsData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      
+      // Calculate member stats for leaderboard
+      calculateMemberStats(receiptsData, teamData);
     } catch (err) {
       console.error('Error loading team:', err);
     }
     setLoading(false);
+  }
+
+  function calculateMemberStats(receiptsData, teamData) {
+    // Group receipts by user
+    const statsByUser = {};
+    
+    receiptsData.forEach(receipt => {
+      if (!statsByUser[receipt.userId]) {
+        statsByUser[receipt.userId] = {
+          userId: receipt.userId,
+          email: receipt.userEmail,
+          points: 0,
+          receiptsCount: 0
+        };
+      }
+      statsByUser[receipt.userId].points += receipt.points || 0;
+      statsByUser[receipt.userId].receiptsCount += 1;
+    });
+
+    // Convert to array and sort by points
+    const statsArray = Object.values(statsByUser)
+      .sort((a, b) => b.points - a.points);
+
+    setMemberStats(statsArray);
   }
 
   async function handleFileSelect(file) {
@@ -70,14 +98,7 @@ function TeamDashboard() {
       const preview = URL.createObjectURL(file);
       setPreviewUrl(preview);
       
-      // Check if OpenAI is configured
-      const apiKey = localStorage.getItem('openai_api_key');
-      if (!apiKey) {
-        alert('⚠️ OpenAI API key not configured. Please go to Settings to set up automatic receipt processing.');
-        return;
-      }
-      
-      // Process receipt with OCR
+      // Process receipt with OCR (server-side via Cloud Function)
       setProcessing(true);
       try {
         const result = await processReceiptImage(file);
@@ -226,32 +247,32 @@ function TeamDashboard() {
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Team Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl shadow-lg p-8 mb-8">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-4xl font-bold mb-2">{team.name}</h1>
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl shadow-lg p-4 md:p-8 mb-8">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl font-bold mb-2">{team.name}</h1>
               <p className="text-indigo-100 mb-4">
                 {competition?.name}
               </p>
-              <div className="flex gap-8">
+              <div className="grid grid-cols-3 gap-4 md:flex md:gap-8">
                 <div>
-                  <p className="text-indigo-200 text-sm">Team Members</p>
-                  <p className="text-3xl font-bold">{team.members?.length || 0}</p>
+                  <p className="text-indigo-200 text-xs md:text-sm">Team Members</p>
+                  <p className="text-2xl md:text-3xl font-bold">{team.members?.length || 0}</p>
                 </div>
                 <div>
-                  <p className="text-indigo-200 text-sm">Total Points</p>
-                  <p className="text-3xl font-bold">{team.totalPoints || 0}</p>
+                  <p className="text-indigo-200 text-xs md:text-sm">Total Points</p>
+                  <p className="text-2xl md:text-3xl font-bold">{team.totalPoints || 0}</p>
                 </div>
                 <div>
-                  <p className="text-indigo-200 text-sm">Receipts</p>
-                  <p className="text-3xl font-bold">{team.receiptsCount || 0}</p>
+                  <p className="text-indigo-200 text-xs md:text-sm">Receipts</p>
+                  <p className="text-2xl md:text-3xl font-bold">{team.receiptsCount || 0}</p>
                 </div>
               </div>
             </div>
             {isTeamMember && (
               <button
                 onClick={() => setShowUploadModal(true)}
-                className="bg-white text-indigo-600 px-6 py-3 rounded-lg font-semibold hover:bg-indigo-50 transition-colors flex items-center gap-2"
+                className="bg-white text-indigo-600 px-4 py-2 md:px-6 md:py-3 rounded-lg font-semibold hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 text-sm md:text-base whitespace-nowrap self-start md:self-auto"
               >
                 <span className="text-xl">📸</span>
                 Upload Receipt
@@ -347,23 +368,10 @@ function TeamDashboard() {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800">
                     <strong>Point System:</strong> $1 = 100 points<br/>
-                    <strong>AI Verification:</strong> Receipts are automatically verified using GPT-4 Vision
+                    <strong>AI Verification:</strong> Receipts are automatically verified using GPT-4 Vision<br/>
+                    <strong>Secure:</strong> All processing happens server-side for your security
                   </p>
                 </div>
-
-                {!localStorage.getItem('openai_api_key') && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <p className="text-sm text-yellow-800">
-                      ⚠️ <strong>OCR not configured:</strong>{' '}
-                      <button
-                        onClick={() => navigate('/settings')}
-                        className="text-indigo-600 hover:text-indigo-700 underline"
-                      >
-                        Set up automatic receipt verification
-                      </button>
-                    </p>
-                  </div>
-                )}
               </div>
 
               <div className="flex gap-3 mt-6">
@@ -386,25 +394,97 @@ function TeamDashboard() {
           </div>
         )}
 
+        {/* Top Contributors Leaderboard */}
+        {memberStats.length > 0 && (
+          <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl shadow-lg p-8 mb-8 border-2 border-yellow-200">
+            <div className="flex items-center gap-3 mb-6">
+              <span className="text-4xl">🏆</span>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Top Contributors</h2>
+                <p className="text-gray-600">Team MVP's earning the most points!</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              {memberStats.slice(0, 3).map((member, index) => {
+                const medals = ['🥇', '🥈', '🥉'];
+                const colors = [
+                  'from-yellow-400 to-yellow-500',
+                  'from-gray-300 to-gray-400', 
+                  'from-orange-400 to-orange-500'
+                ];
+                const textColors = ['text-yellow-900', 'text-gray-900', 'text-orange-900'];
+                
+                return (
+                  <div 
+                    key={member.userId} 
+                    className={`relative bg-gradient-to-r ${colors[index]} rounded-xl p-5 shadow-md transform transition-transform hover:scale-[1.02]`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="text-5xl">{medals[index]}</div>
+                        <div>
+                          <p className={`font-bold text-lg ${textColors[index]}`}>
+                            {member.email}
+                            {member.userId === currentUser?.uid && (
+                              <span className="ml-2 text-sm">(You!)</span>
+                            )}
+                          </p>
+                          <p className={`text-sm ${textColors[index]} opacity-90`}>
+                            {member.receiptsCount} receipt{member.receiptsCount !== 1 ? 's' : ''} uploaded
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-3xl font-bold ${textColors[index]}`}>
+                          {member.points.toLocaleString()}
+                        </p>
+                        <p className={`text-sm ${textColors[index]} opacity-90`}>points</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Team Members */}
         <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">👥 Team Members</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">👥 All Team Members</h2>
           <div className="space-y-3">
-            {team.memberEmails?.map((email, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                  <span className="text-indigo-600 font-semibold">
-                    {email.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">{email}</p>
-                  {team.createdBy === team.members[index] && (
-                    <p className="text-sm text-gray-500">Team Creator</p>
+            {team.memberEmails?.map((email, index) => {
+              const memberStat = memberStats.find(s => s.userId === team.members[index]);
+              return (
+                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <span className="text-indigo-600 font-semibold">
+                        {email.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{email}</p>
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        {team.createdBy === team.members[index] && (
+                          <span>Team Creator</span>
+                        )}
+                        {memberStat && (
+                          <span>• {memberStat.points} pts</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {memberStat && (
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-indigo-600">
+                        {memberStat.receiptsCount} receipt{memberStat.receiptsCount !== 1 ? 's' : ''}
+                      </p>
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

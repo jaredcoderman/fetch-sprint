@@ -6,7 +6,6 @@ import Competitions from './pages/Competitions'
 import CompetitionDetail from './pages/CompetitionDetail'
 import TeamDashboard from './pages/TeamDashboard'
 import CreateCompetition from './pages/CreateCompetition'
-import Settings from './pages/Settings'
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -16,19 +15,21 @@ function LandingPage() {
       {/* Landing Page */}
       <div className="max-w-6xl mx-auto px-4 py-12">
         {/* Hero Section */}
-        <div className="text-center py-20">
-          <h1 className="text-6xl font-bold text-gray-900 mb-6">
+        <div className="text-center py-20 max-w-6xl mx-auto">
+          <h1 className="text-6xl font-bold text-gray-900 mb-8 w-full">
             Receipt Sprint
           </h1>
-          <p className="text-2xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Compete with your team, scan receipts, and win prizes!
-          </p>
-          <p className="text-lg text-gray-500 mb-12 max-w-3xl mx-auto">
-            Join exciting competitions, form teams with friends, scan your shopping receipts, 
-            and earn points based on your purchases. The team with the most points wins!
-          </p>
+          <div className="flex flex-col items-center w-full mt-8">
+            <p className="text-2xl text-gray-600 mb-6 max-w-2xl w-full text-center">
+              Compete with your team, scan receipts, and win prizes!
+            </p>
+            <p className="text-lg text-gray-500 mb-12 max-w-3xl w-full text-center leading-relaxed">
+              Join exciting competitions, form teams with friends, scan your shopping receipts, 
+              and earn points based on your purchases. The team with the most points wins!
+            </p>
+          </div>
           
-          <div className="flex gap-4 justify-center">
+          <div className="flex gap-4 justify-center mt-8">
             <button 
               onClick={() => navigate('/login')}
               className="bg-indigo-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-indigo-700 transition-colors shadow-lg hover:shadow-xl"
@@ -46,7 +47,7 @@ function LandingPage() {
 
         {/* How It Works Section */}
         <div className="mt-24">
-          <h2 className="text-4xl font-bold text-center text-gray-900 mb-16">
+          <h2 className="text-4xl font-bold text-center text-gray-900 mb-16 pb-12">
             How It Works
           </h2>
           <div className="grid md:grid-cols-4 gap-8">
@@ -97,7 +98,7 @@ function LandingPage() {
           <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">
             Features
           </h2>
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-2 gap-8 mt-8">
             <div className="flex items-start space-x-4">
               <div className="text-2xl">✅</div>
               <div>
@@ -151,7 +152,6 @@ function App() {
         <Route path="/competition/:id" element={<CompetitionDetail />} />
         <Route path="/team/:id" element={<TeamDashboard />} />
         <Route path="/create-competition" element={<CreateCompetition />} />
-        <Route path="/settings" element={<Settings />} />
       </Routes>
     </AuthProvider>
   )

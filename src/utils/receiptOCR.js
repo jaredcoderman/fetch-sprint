@@ -1,102 +1,45 @@
-import OpenAI from 'openai';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import app from '../firebase';
 
-// Initialize OpenAI client
-// Note: In production, this should be done via a backend/Cloud Function to keep API key secure
-let openai = null;
-
-export function initializeOpenAI(apiKey) {
-  openai = new OpenAI({
-    apiKey: apiKey,
-    dangerouslyAllowBrowser: true // Only for development! Use backend in production
-  });
-}
+// Initialize Cloud Functions
+const functions = getFunctions(app);
 
 /**
- * Process receipt image and extract total amount using GPT-4 Vision
+ * Process receipt image using Cloud Function (server-side)
+ * This keeps the OpenAI API key secure on the backend
  * @param {File} imageFile - The receipt image file
  * @returns {Promise<Object>} - Object containing amount and extracted data
  */
 export async function processReceiptImage(imageFile) {
-  if (!openai) {
-    throw new Error('OpenAI not initialized. Please set your API key first.');
-  }
-
   try {
     // Convert image to base64
     const base64Image = await fileToBase64(imageFile);
     
-    // Call GPT-4 Vision API
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Using mini for cost efficiency, use "gpt-4o" for better accuracy
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Analyze this receipt image and extract the following information:
-1. Total amount (the final total paid, not subtotal)
-2. Store name
-3. Date (if visible)
-4. Currency (default to USD if not visible)
-
-Return ONLY a JSON object in this exact format:
-{
-  "total": 25.50,
-  "storeName": "Store Name",
-  "date": "2024-01-15",
-  "currency": "USD",
-  "confidence": "high"
-}
-
-If you cannot clearly read the total, set confidence to "low" or "none".
-Make sure the total is a number without currency symbols.`
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: base64Image
-              }
-            }
-          ]
-        }
-      ],
-      max_tokens: 500
-    });
-
-    // Parse the response
-    const content = response.choices[0].message.content;
-    console.log('OpenAI Response:', content);
+    // Call Cloud Function
+    const processReceipt = httpsCallable(functions, 'processReceipt');
+    const result = await processReceipt({ imageBase64: base64Image });
     
-    // Extract JSON from response (sometimes it includes markdown formatting)
-    let jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Could not parse receipt data from response');
-    }
-    
-    const data = JSON.parse(jsonMatch[0]);
-    
-    // Validate the response
-    if (!data.total || typeof data.total !== 'number') {
-      throw new Error('Could not extract total amount from receipt');
-    }
-    
-    if (data.confidence === 'none' || data.confidence === 'low') {
-      throw new Error('Receipt image is too unclear to read accurately');
-    }
-    
+    // Return the processed data
     return {
-      amount: data.total,
-      storeName: data.storeName || 'Unknown Store',
-      date: data.date || new Date().toISOString().split('T')[0],
-      currency: data.currency || 'USD',
-      confidence: data.confidence,
-      rawResponse: content
+      amount: result.data.amount,
+      storeName: result.data.storeName || 'Unknown Store',
+      date: result.data.date || new Date().toISOString().split('T')[0],
+      currency: result.data.currency || 'USD',
+      confidence: result.data.confidence,
+      processedAt: result.data.processedAt
     };
     
   } catch (error) {
     console.error('Error processing receipt:', error);
-    throw new Error(`Failed to process receipt: ${error.message}`);
+    
+    // Provide user-friendly error messages
+    if (error.code === 'unauthenticated') {
+      throw new Error('Please log in to process receipts');
+    } else if (error.code === 'failed-precondition') {
+      throw new Error('Receipt processing is not configured. Contact administrator.');
+    } else {
+      throw new Error(`Failed to process receipt: ${error.message}`);
+    }
   }
 }
 
@@ -133,3 +76,18 @@ export function validateReceiptImage(file) {
   return true;
 }
 
+/**
+ * Verify a receipt that was already uploaded
+ * @param {string} receiptId - Firestore receipt document ID
+ * @returns {Promise<Object>} - Verification result
+ */
+export async function verifyReceipt(receiptId) {
+  try {
+    const verifyReceiptFn = httpsCallable(functions, 'verifyReceipt');
+    const result = await verifyReceiptFn({ receiptId });
+    return result.data;
+  } catch (error) {
+    console.error('Error verifying receipt:', error);
+    throw new Error(`Failed to verify receipt: ${error.message}`);
+  }
+}
