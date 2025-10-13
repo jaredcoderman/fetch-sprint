@@ -178,3 +178,77 @@ exports.verifyReceipt = onCall(
   }
 });
 
+/**
+ * Reserve a unique receipt hash per competition to prevent duplicates
+ * Creates a doc with ID `${competitionId}_${imageHash}`; fails if it exists
+ */
+exports.reserveReceiptHash = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const { competitionId, imageHash } = request.data || {};
+  if (!competitionId || typeof competitionId !== 'string') {
+    throw new HttpsError('invalid-argument', 'competitionId is required');
+  }
+  if (!imageHash || typeof imageHash !== 'string' || imageHash.length < 32) {
+    throw new HttpsError('invalid-argument', 'imageHash is required');
+  }
+
+  const docId = `${competitionId}_${imageHash}`;
+  const ref = admin.firestore().collection('receiptHashes').doc(docId);
+
+  try {
+    await ref.create({
+      competitionId,
+      imageHash,
+      userId: request.auth.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return { reserved: true };
+  } catch (error) {
+    // Firestore create() throws if already exists
+    if (error && (error.code === 6 || error.code === 'already-exists')) {
+      throw new HttpsError('already-exists', 'Duplicate receipt for this competition');
+    }
+    console.error('Error reserving receipt hash:', error);
+    throw new HttpsError('internal', 'Failed to reserve receipt hash');
+  }
+});
+
+/**
+ * Release a reserved receipt hash if the upload fails
+ */
+exports.releaseReceiptHash = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const { competitionId, imageHash } = request.data || {};
+  if (!competitionId || typeof competitionId !== 'string') {
+    throw new HttpsError('invalid-argument', 'competitionId is required');
+  }
+  if (!imageHash || typeof imageHash !== 'string' || imageHash.length < 32) {
+    throw new HttpsError('invalid-argument', 'imageHash is required');
+  }
+
+  const docId = `${competitionId}_${imageHash}`;
+  const ref = admin.firestore().collection('receiptHashes').doc(docId);
+
+  try {
+    const snap = await ref.get();
+    if (!snap.exists) {
+      return { released: true, existed: false };
+    }
+    const data = snap.data();
+    if (data.userId && data.userId !== request.auth.uid) {
+      throw new HttpsError('permission-denied', 'Not owner of reservation');
+    }
+    await ref.delete();
+    return { released: true, existed: true };
+  } catch (error) {
+    console.error('Error releasing receipt hash:', error);
+    throw new HttpsError('internal', 'Failed to release receipt hash');
+  }
+});
+

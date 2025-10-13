@@ -91,3 +91,25 @@ export async function verifyReceipt(receiptId) {
     throw new Error(`Failed to verify receipt: ${error.message}`);
   }
 }
+
+/**
+ * Reserve a receipt hash for a competition (server-side uniqueness)
+ * @param {string} competitionId
+ * @param {string} imageHash
+ */
+export async function reserveReceiptHash(competitionId, imageHash) {
+  const fn = httpsCallable(functions, 'reserveReceiptHash');
+  const res = await fn({ competitionId, imageHash });
+  return res.data;
+}
+
+/**
+ * Release a reserved receipt hash (call if upload fails/cancelled)
+ * @param {string} competitionId
+ * @param {string} imageHash
+ */
+export async function releaseReceiptHash(competitionId, imageHash) {
+  const fn = httpsCallable(functions, 'releaseReceiptHash');
+  const res = await fn({ competitionId, imageHash });
+  return res.data;
+}

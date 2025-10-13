@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, increment } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { processReceiptImage, validateReceiptImage } from '../utils/receiptOCR';
+import { processReceiptImage, validateReceiptImage, reserveReceiptHash, releaseReceiptHash } from '../utils/receiptOCR';
 
 function TeamDashboard() {
   const { id } = useParams();
@@ -24,6 +24,7 @@ function TeamDashboard() {
   const [ocrData, setOcrData] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [memberStats, setMemberStats] = useState([]);
+  const [imageHash, setImageHash] = useState(null);
 
   useEffect(() => {
     loadTeamData();
@@ -85,19 +86,46 @@ function TeamDashboard() {
     setMemberStats(statsArray);
   }
 
+  // Compute SHA-256 hash for duplicate detection
+  async function computeFileSHA256(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+  }
+
   async function handleFileSelect(file) {
     if (!file) return;
 
     try {
       // Validate file
       validateReceiptImage(file);
-      
+
+      // Ensure team/competition is loaded before duplicate check
+      if (!team?.competitionId) {
+        throw new Error('Team/competition not loaded yet. Please wait a moment and try again.');
+      }
+
+      // Compute content hash and check for duplicates in this competition
+      const hash = await computeFileSHA256(file);
+
+      const dupQuery = query(collection(db, 'receipts'), where('imageHash', '==', hash));
+      const dupSnapshot = await getDocs(dupQuery);
+      const duplicateInCompetition = dupSnapshot.docs.some(d => d.data()?.competitionId === team.competitionId);
+      if (duplicateInCompetition) {
+        alert('This receipt has already been uploaded in this competition.');
+        return;
+      }
+
+      // No duplicate: keep hash and continue
+      setImageHash(hash);
       setUploadFile(file);
-      
+
       // Create preview
       const preview = URL.createObjectURL(file);
       setPreviewUrl(preview);
-      
+
       // Process receipt with OCR (server-side via Cloud Function)
       setProcessing(true);
       try {
@@ -138,6 +166,33 @@ function TeamDashboard() {
     setUploading(true);
 
     try {
+      // Double-check for duplicates right before upload to avoid races
+      if (team?.competitionId && imageHash) {
+        const dupQuery = query(collection(db, 'receipts'), where('imageHash', '==', imageHash));
+        const dupSnapshot = await getDocs(dupQuery);
+        const duplicateInCompetition = dupSnapshot.docs.some(d => d.data()?.competitionId === team.competitionId);
+        if (duplicateInCompetition) {
+          alert('This receipt has already been uploaded in this competition.');
+          setUploading(false);
+          return;
+        }
+      }
+
+      // Reserve server-side now to ensure uniqueness across clients
+      if (team?.competitionId && imageHash) {
+        try {
+          await reserveReceiptHash(team.competitionId, imageHash);
+        } catch (e) {
+          // Only block if it's an actual duplicate; otherwise continue best-effort
+          if (e && (e.code === 'already-exists' || e.message?.includes('already'))) {
+            alert('This receipt has already been uploaded in this competition.');
+            setUploading(false);
+            return;
+          }
+          console.warn('reserveReceiptHash failed; continuing without reservation', e);
+        }
+      }
+
       // Upload image to Firebase Storage
       const fileRef = ref(storage, `receipts/${id}/${Date.now()}_${uploadFile.name}`);
       await uploadBytes(fileRef, uploadFile);
@@ -153,6 +208,7 @@ function TeamDashboard() {
         userId: currentUser.uid,
         userEmail: currentUser.email,
         imageUrl,
+        imageHash: imageHash || null,
         amount,
         points,
         description: uploadDescription,
@@ -184,6 +240,10 @@ function TeamDashboard() {
       }
     } catch (err) {
       console.error('Error uploading receipt:', err);
+      // Release reservation if we made one
+      if (team?.competitionId && imageHash) {
+        try { await releaseReceiptHash(team.competitionId, imageHash); } catch (_) {}
+      }
       alert('Failed to upload receipt. Please try again.');
     }
 
@@ -196,12 +256,15 @@ function TeamDashboard() {
     setUploadAmount('');
     setUploadDescription('');
     setOcrData(null);
+    setImageHash(null);
     setProcessing(false);
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
     }
   }
+
+  // Note: We reserve server-side only during upload. On failure we release immediately.
 
   if (loading) {
     return (

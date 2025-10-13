@@ -231,6 +231,7 @@ fetch-sprint/
   userId: string,
   userEmail: string,
   imageUrl: string,
+  imageHash: string, // used to prevent duplicate uploads per competition
   amount: number,
   points: number,
   description: string,
