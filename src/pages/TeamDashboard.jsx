@@ -151,7 +151,7 @@ function TeamDashboard() {
         teamId: id,
         competitionId: team.competitionId,
         userId: currentUser.uid,
-        userEmail: currentUser.email,
+        userEmail: currentUser.email || 'Anonymous',
         imageUrl,
         amount,
         points,

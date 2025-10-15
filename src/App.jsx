@@ -1,7 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
-import Login from './pages/Login'
 import Competitions from './pages/Competitions'
 import CompetitionDetail from './pages/CompetitionDetail'
 import TeamDashboard from './pages/TeamDashboard'
@@ -9,6 +8,15 @@ import CreateCompetition from './pages/CreateCompetition'
 
 function LandingPage() {
   const navigate = useNavigate();
+  const [schoolName, setSchoolName] = useState('');
+
+  function slugify(value) {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -29,12 +37,22 @@ function LandingPage() {
             </p>
           </div>
           
-          <div className="flex gap-4 justify-center mt-8">
-            <button 
-              onClick={() => navigate('/login')}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8 items-stretch sm:items-center">
+            <input
+              type="text"
+              value={schoolName}
+              onChange={(e) => setSchoolName(e.target.value)}
+              placeholder="Enter your school name"
+              className="w-full sm:w-96 px-4 py-4 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+            />
+            <button
+              onClick={() => {
+                const slug = slugify(schoolName);
+                if (slug) navigate(`/school/${encodeURIComponent(slug)}`);
+              }}
               className="bg-indigo-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-indigo-700 transition-colors shadow-lg hover:shadow-xl"
             >
-              Get Started
+              Go to School Page
             </button>
             <button 
               onClick={() => navigate('/competitions')}
@@ -147,7 +165,7 @@ function App() {
     <AuthProvider>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />
+          <Route path="/school/:schoolName" element={<Competitions />} />
         <Route path="/competitions" element={<Competitions />} />
         <Route path="/competition/:id" element={<CompetitionDetail />} />
         <Route path="/team/:id" element={<TeamDashboard />} />

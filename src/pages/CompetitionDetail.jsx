@@ -50,11 +50,12 @@ function CompetitionDetail() {
     if (!newTeamName.trim()) return;
     
     try {
+      const fallbackEmail = currentUser?.email || 'Anonymous';
       const teamData = {
         name: newTeamName,
         competitionId: id,
         members: [currentUser.uid],
-        memberEmails: [currentUser.email],
+        memberEmails: [fallbackEmail],
         totalPoints: 0,
         receiptsCount: 0,
         createdAt: new Date().toISOString(),
@@ -80,14 +81,15 @@ function CompetitionDetail() {
 
   async function handleJoinTeam(teamId) {
     if (!currentUser) {
-      navigate('/login');
-      return;
+      // Auth is anonymous; this should not happen with the new flow
+      alert('Joining a team requires a user session. Please try again.');
+      return; 
     }
 
     try {
       await updateDoc(doc(db, 'teams', teamId), {
         members: arrayUnion(currentUser.uid),
-        memberEmails: arrayUnion(currentUser.email)
+        memberEmails: arrayUnion(currentUser.email || 'Anonymous')
       });
 
       // Update competition participant count
