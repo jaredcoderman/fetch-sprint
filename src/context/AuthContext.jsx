@@ -5,7 +5,8 @@ import {
   signOut, 
   onAuthStateChanged,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInAnonymously
 } from 'firebase/auth';
 import { auth } from '../firebase';
 
@@ -38,6 +39,13 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      // If no user, sign in anonymously so the app works without login
+      if (!user) {
+        signInAnonymously(auth).catch((err) => {
+          console.error('Anonymous auth failed:', err);
+        });
+        return; // wait for the next auth state change with a user
+      }
       setCurrentUser(user);
       setLoading(false);
     });

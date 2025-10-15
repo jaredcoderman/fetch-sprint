@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useNavigate, useParams } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 function Competitions() {
   const [competitions, setCompetitions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const { schoolName } = useParams();
+
+  const decodedSchoolName = schoolName
+    ? decodeURIComponent(schoolName).replace(/-/g, ' ')
+    : null;
 
   useEffect(() => {
     loadCompetitions();
@@ -28,36 +31,29 @@ function Competitions() {
     setLoading(false);
   }
 
-  async function handleLogout() {
-    try {
-      await logout();
-      navigate('/');
-    } catch (err) {
-      console.error('Failed to logout:', err);
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+          <button 
+            onClick={() => navigate('/')}
+            className="text-indigo-600 hover:text-indigo-700 font-medium"
+          >
+            ← Home
+          </button>
           <h1 className="text-2xl font-bold text-indigo-600">Receipt Sprint</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-gray-600">{currentUser?.email}</span>
-            <button
-              onClick={handleLogout}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              Logout
-            </button>
-          </div>
+          <div className="w-20"></div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Active Competitions</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Active Competitions {decodedSchoolName && (
+              <span className="text-indigo-600">for {decodedSchoolName}</span>
+            )}
+          </h2>
           <p className="text-gray-600">Choose a competition to join and start scanning receipts!</p>
         </div>
 
