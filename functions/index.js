@@ -66,6 +66,7 @@ exports.processReceipt = onCall(
 2. Store name
 3. Date (if visible)
 4. Currency (default to USD if not visible)
+5. Full text content of the receipt (all visible text)
 
 Return ONLY a JSON object in this exact format:
 {
@@ -73,11 +74,13 @@ Return ONLY a JSON object in this exact format:
   "storeName": "Store Name",
   "date": "2024-01-15",
   "currency": "USD",
-  "confidence": "high"
+  "confidence": "high",
+  "fullText": "All the text content from the receipt..."
 }
 
 If you cannot clearly read the total, set confidence to "low" or "none".
-Make sure the total is a number without currency symbols.`
+Make sure the total is a number without currency symbols.
+Include all readable text from the receipt in the fullText field.`
             },
             {
               type: "image_url",
@@ -118,6 +121,7 @@ Make sure the total is a number without currency symbols.`
       date: data.date || new Date().toISOString().split('T')[0],
       currency: data.currency || 'USD',
       confidence: data.confidence,
+      fullText: data.fullText || '',
       processedAt: new Date().toISOString()
     };
 
@@ -177,4 +181,174 @@ exports.verifyReceipt = onCall(
     throw new HttpsError('internal', error.message);
   }
 });
+
+/**
+ * Cloud Function to validate university names using Admin SDK
+ * This bypasses client-side Firestore rules and queries the complete database
+ */
+exports.validateUniversity = onCall(
+  async (request) => {
+    const { schoolName } = request.data;
+
+    if (!schoolName || typeof schoolName !== 'string') {
+      throw new HttpsError('invalid-argument', 'School name is required');
+    }
+
+    try {
+      console.log('Validating university:', schoolName);
+      
+      const db = admin.firestore();
+      const searchTerm = schoolName.trim();
+      const searchTermLower = searchTerm.toLowerCase();
+      
+      // First try exact match
+      console.log('Trying exact match for:', searchTerm);
+      const exactQuery = db.collection('universities')
+        .where('name', '==', searchTerm)
+        .limit(1);
+      
+      const exactSnapshot = await exactQuery.get();
+      console.log('Exact match results:', exactSnapshot.size);
+      
+      if (!exactSnapshot.empty) {
+        const schoolData = exactSnapshot.docs[0].data();
+        console.log('Found exact match:', schoolData);
+        return { 
+          isValid: true, 
+          school: schoolData,
+          matchType: 'exact'
+        };
+      }
+      
+      // Try partial match (case-insensitive)
+      console.log('Trying partial match for:', searchTermLower);
+      const allQuery = db.collection('universities').limit(7000);
+      const allSnapshot = await allQuery.get();
+      console.log('Total universities in database:', allSnapshot.size);
+      
+      for (const doc of allSnapshot.docs) {
+        const university = doc.data();
+        if (university.name && university.name.toLowerCase().includes(searchTermLower)) {
+          console.log('Found partial match:', university);
+          return { 
+            isValid: true, 
+            school: university,
+            matchType: 'partial'
+          };
+        }
+      }
+      
+      console.log('No matches found for:', searchTerm);
+      return { 
+        isValid: false, 
+        message: `School "${searchTerm}" not found in our database. Please check the spelling or try a different name.`,
+        searchedCount: allSnapshot.size
+      };
+      
+    } catch (error) {
+      console.error('Error validating university:', error);
+      throw new HttpsError('internal', `Failed to validate university: ${error.message}`);
+    }
+  }
+);
+
+/**
+ * Cloud Function to verify Fetch app profile screenshots using AI
+ * Checks for profile picture icon and "Fetch" text to validate authenticity
+ */
+exports.verifyFetchProfile = onCall(
+  { secrets: ['OPENAI_API_KEY'] },
+  async (request) => {
+    const { imageUrl } = request.data;
+
+    if (!imageUrl || typeof imageUrl !== 'string') {
+      throw new HttpsError('invalid-argument', 'Image URL is required');
+    }
+
+    try {
+      console.log('Verifying Fetch profile screenshot:', imageUrl);
+      
+      // Check if OpenAI API key is configured
+      const openaiClient = getOpenAI();
+      if (!openaiClient) {
+        throw new HttpsError(
+          'failed-precondition',
+          'OpenAI API key not configured. Administrator needs to add the OPENAI_API_KEY secret in Firebase Console.'
+        );
+      }
+
+      // Call GPT-4 Vision API to analyze the screenshot
+      const response = await openaiClient.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Analyze this screenshot to determine if it shows a legitimate Fetch app profile. Look for these specific elements:
+
+1. A person's full name displayed near the top of the screen (first name and last name)
+2. The word "Fetch" visible on screen (in app name, branding, or text)
+3. Profile-related UI elements (points, settings, profile information, etc.)
+4. Overall app interface that looks like a mobile app profile screen
+
+Return ONLY a JSON object in this exact format:
+{
+  "isValid": true/false,
+  "confidence": "high/medium/low",
+  "details": "Brief explanation of what you found",
+  "reasons": ["list", "of", "specific", "reasons"]
+}
+
+If you cannot clearly see a person's full name (first and last name) near the top of the screen AND the word "Fetch" on screen, set isValid to false.
+Be strict - only approve screenshots that clearly show a Fetch app profile with a visible full name.`
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageUrl
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 300
+      });
+
+      const content = response.choices[0].message.content;
+      console.log('OpenAI Response:', content);
+
+      // Extract JSON from response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Could not parse verification data from response');
+      }
+
+      const verificationData = JSON.parse(jsonMatch[0]);
+
+      // Validate the response structure
+      if (typeof verificationData.isValid !== 'boolean') {
+        throw new Error('Invalid verification response format');
+      }
+
+      console.log('Verification result:', verificationData);
+
+      return {
+        isValid: verificationData.isValid,
+        confidence: verificationData.confidence || 'unknown',
+        details: verificationData.details || 'No details provided',
+        reasons: verificationData.reasons || [],
+        verifiedAt: new Date().toISOString()
+      };
+
+    } catch (error) {
+      console.error('Error verifying Fetch profile:', error);
+      throw new HttpsError(
+        'internal',
+        `Failed to verify Fetch profile: ${error.message}`
+      );
+    }
+  }
+);
 
