@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { checkExpiredCompetitions } from '../utils/winnerDetection';
 
 function Competitions() {
   const [competitions, setCompetitions] = useState([]);
@@ -12,6 +13,28 @@ function Competitions() {
 
   useEffect(() => {
     loadCompetitions();
+    // Check for expired competitions when component loads
+    checkExpiredCompetitions();
+    
+    // Set up real-time listener for competitions
+    const unsubscribe = onSnapshot(collection(db, 'competitions'), (snapshot) => {
+      const comps = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setCompetitions(comps);
+      setLoading(false);
+    });
+    
+    // Set up a timer to check for expired competitions every 30 seconds
+    const interval = setInterval(async () => {
+      await checkExpiredCompetitions();
+    }, 30000);
+    
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, []);
 
   async function loadCompetitions() {

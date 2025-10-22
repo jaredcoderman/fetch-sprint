@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import ProfilePicture from '../components/ProfilePicture';
 import { checkExpiredCompetitions } from '../utils/winnerDetection';
@@ -25,6 +25,34 @@ function CompetitionDetail() {
     loadCompetitionData();
     // Check for expired competitions when component loads
     checkExpiredCompetitions();
+    
+    // Set up real-time listener for competition updates
+    const unsubscribeCompetition = onSnapshot(doc(db, 'competitions', id), (doc) => {
+      if (doc.exists()) {
+        setCompetition({ id: doc.id, ...doc.data() });
+      }
+    });
+    
+    // Set up real-time listener for teams updates
+    const teamsQuery = query(collection(db, 'teams'), where('competitionId', '==', id));
+    const unsubscribeTeams = onSnapshot(teamsQuery, (snapshot) => {
+      const teamsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setTeams(teamsData.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0)));
+    });
+    
+    // Set up a timer to check for expired competitions every 30 seconds
+    const interval = setInterval(async () => {
+      await checkExpiredCompetitions();
+    }, 30000);
+    
+    return () => {
+      unsubscribeCompetition();
+      unsubscribeTeams();
+      clearInterval(interval);
+    };
   }, [id]);
 
   useEffect(() => {

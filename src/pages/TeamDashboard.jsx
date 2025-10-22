@@ -68,7 +68,18 @@ function TeamDashboard() {
         // Load competition
         const compDoc = await getDoc(doc(db, 'competitions', teamData.competitionId));
         if (compDoc.exists()) {
-          setCompetition({ id: compDoc.id, ...compDoc.data() });
+          const competitionData = { id: compDoc.id, ...compDoc.data() };
+          setCompetition(competitionData);
+          
+          // Check if competition is already completed
+          if (competitionData.status === 'completed') {
+            setCompetitionCompleted(true);
+            // Get winner message for this team
+            const message = await getWinnerMessage(competitionData.id, id);
+            if (message) {
+              setWinnerMessage(message);
+            }
+          }
         }
       }
 
@@ -221,29 +232,90 @@ function TeamDashboard() {
     setBonusPreviewUrl(null);
   }
 
-  async function checkForDuplicateReceipt(ocrText) {
+  async function checkForDuplicateReceipt(newReceipt) {
+    if (!newReceipt || !team?.competitionId) {
+      return { isDuplicate: false };
+    }
+
     try {
+      // Get all receipts from this competition
       const receiptsQuery = query(
         collection(db, 'receipts'),
-        where('teamId', '==', id)
+        where('competitionId', '==', team.competitionId)
       );
       const receiptsSnapshot = await getDocs(receiptsQuery);
       
-      for (const doc of receiptsSnapshot.docs) {
-        const receipt = doc.data();
-        if (receipt.ocrText && receipt.ocrText === ocrText) {
+      // Normalize store names for comparison
+      const normalizeStoreName = (name) => {
+        if (!name) return '';
+        return name.toLowerCase()
+          .replace(/[^a-z0-9]/g, '')
+          .trim();
+      };
+      
+      const newStoreName = normalizeStoreName(newReceipt.storeName);
+      const newAmount = parseFloat(newReceipt.amount);
+      const newDate = newReceipt.date ? new Date(newReceipt.date).toDateString() : '';
+      
+      // Check each existing receipt
+      for (const docSnap of receiptsSnapshot.docs) {
+        const existing = docSnap.data();
+        
+        const existingStoreName = normalizeStoreName(existing.storeName);
+        const existingAmount = parseFloat(existing.amount);
+        const existingDate = existing.createdAt ? new Date(existing.createdAt).toDateString() : '';
+        
+        // Check if store name matches (or very similar)
+        const storeMatch = existingStoreName === newStoreName || 
+                          existingStoreName.includes(newStoreName) || 
+                          newStoreName.includes(existingStoreName);
+        
+        // Check if amount matches (within 1 cent)
+        const amountMatch = Math.abs(existingAmount - newAmount) < 0.02;
+        
+        // Check if same day
+        const dateMatch = existingDate === newDate;
+        
+        // If store, amount, and date all match - it's a duplicate
+        if (storeMatch && amountMatch && dateMatch) {
           return {
             isDuplicate: true,
-            originalUser: receipt.userName || receipt.userEmail
+            originalUser: existing.userName || existing.userEmail || 'Unknown'
           };
+        }
+        
+        // Alternative: If store and amount match, and text is very similar
+        if (storeMatch && amountMatch && newReceipt.text && existing.ocrText) {
+          const textSimilarity = calculateTextSimilarity(newReceipt.text, existing.ocrText);
+          
+          if (textSimilarity > 0.4) {
+            return {
+              isDuplicate: true,
+              originalUser: existing.userName || existing.userEmail || 'Unknown'
+            };
+          }
         }
       }
       
       return { isDuplicate: false };
-    } catch (err) {
-      console.error('Error checking for duplicates:', err);
+      
+    } catch (error) {
+      console.error('Error checking duplicates:', error);
       return { isDuplicate: false };
     }
+  }
+
+  function calculateTextSimilarity(text1, text2) {
+    if (!text1 || !text2) return 0;
+    
+    const normalize = (text) => text.toLowerCase().replace(/\s+/g, ' ').trim();
+    const words1 = new Set(normalize(text1).split(' ').filter(w => w.length > 2));
+    const words2 = new Set(normalize(text2).split(' ').filter(w => w.length > 2));
+    
+    const intersection = new Set([...words1].filter(x => words2.has(x)));
+    const union = new Set([...words1, ...words2]);
+    
+    return union.size > 0 ? intersection.size / union.size : 0;
   }
 
   async function handleFileSelect(file) {
@@ -261,16 +333,40 @@ function TeamDashboard() {
       
       // Process receipt with OCR (server-side via Cloud Function)
       setProcessing(true);
+      setIsDuplicate(false); // Reset duplicate flag
+      setDuplicateWarning(null);
+      
       try {
         const result = await processReceiptImage(file);
+        
+        // Check for duplicates immediately after OCR
+        const duplicateCheck = await checkForDuplicateReceipt(result);
+        
+        if (duplicateCheck.isDuplicate) {
+          // Mark as duplicate and show warning
+          setIsDuplicate(true);
+          setDuplicateWarning(`This receipt is a duplicate! Originally uploaded by ${duplicateCheck.originalUser}`);
+          alert(`🚫 DUPLICATE RECEIPT DETECTED!\n\nThis receipt has already been uploaded by ${duplicateCheck.originalUser}.\n\nPlease select a different receipt.`);
+          
+          // Clear the form
+          setUploadFile(null);
+          setPreviewUrl(null);
+          setOcrData(null);
+          setUploadAmount('');
+          setUploadDescription('');
+          setProcessing(false);
+          return; // Stop here, don't allow upload
+        }
+        
+        // Not a duplicate, proceed normally
         setOcrData(result);
         setUploadAmount(result.amount.toFixed(2));
         setUploadDescription(result.storeName || '');
         alert(`✓ Receipt processed! Total found: $${result.amount.toFixed(2)}`);
+        
       } catch (ocrError) {
         console.error('OCR Error:', ocrError);
         alert(`⚠️ Could not read receipt automatically: ${ocrError.message}\n\nPlease try uploading a clearer image or contact support.`);
-        // Don't set uploadAmount, so user can't upload without OCR
       } finally {
         setProcessing(false);
       }
@@ -281,6 +377,18 @@ function TeamDashboard() {
   }
 
   async function handleUploadReceipt() {
+    // Check if this is a duplicate receipt
+    if (isDuplicate) {
+      alert('🚫 This receipt has been marked as a duplicate and cannot be uploaded.');
+      return;
+    }
+    
+    // Check if competition is completed
+    if (competition && competition.status === 'completed') {
+      alert('This competition has ended. A team has reached 50,000 points!');
+      return;
+    }
+    
     // Allow uploads even without full profile - use anonymous data if needed
     let userEmail = 'anonymous@example.com';
     let userName = 'Anonymous User';
@@ -372,18 +480,7 @@ function TeamDashboard() {
         }
       }
 
-      // Check for duplicates
-      if (ocrData?.text) {
-        const duplicateCheck = await checkForDuplicateReceipt(ocrData.text);
-        if (duplicateCheck.isDuplicate) {
-          alert(`This receipt cannot be uploaded as it appears to be a duplicate. Originally uploaded by ${duplicateCheck.originalUser}.`);
-          setUploading(false);
-          setShowUploadModal(false);
-          setUploadFile(null);
-          setPreviewUrl(null);
-          return;
-        }
-      }
+      // Duplicate check already performed during file selection
 
       // Create receipt document
       if (!team || !team.competitionId) {
@@ -420,11 +517,13 @@ function TeamDashboard() {
           receiptsCount: increment(1)
         });
 
-        // Check for winner
-        const winnerResult = await determineWinner(id);
+        // Check for winner using competitionId
+        const winnerResult = await determineWinner(team.competitionId);
         if (winnerResult.hasWinner) {
-          setWinnerMessage(winnerResult.winnerMessage);
+          setWinnerMessage(winnerResult.message);
           setCompetitionCompleted(true);
+          // Update the local competition state
+          setCompetition(prev => ({ ...prev, status: 'completed' }));
         }
       }
 
@@ -547,7 +646,7 @@ function TeamDashboard() {
                 </div>
               </div>
             </div>
-            {isTeamMember && (
+            {isTeamMember && !competitionCompleted && (
               <div className="flex flex-col gap-3">
                 <button
                   onClick={() => setShowUploadModal(true)}

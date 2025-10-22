@@ -1,5 +1,5 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import app from '../firebase';
+import { getFunctions, httpsCallable } from "firebase/functions";
+import app from "../firebase";
 
 // Initialize Cloud Functions
 const functions = getFunctions(app);
@@ -14,34 +14,36 @@ export async function processReceiptImage(imageFile) {
   try {
     // Convert image to base64
     const base64Image = await fileToBase64(imageFile);
-    
+
     // Call Cloud Function
-    const processReceipt = httpsCallable(functions, 'processReceipt');
+    const processReceipt = httpsCallable(functions, "processReceipt");
     const result = await processReceipt({ imageBase64: base64Image });
-    
+
     // Return the processed data
     return {
       amount: result.data.amount,
-      storeName: result.data.storeName || 'Unknown Store',
-      date: result.data.date || new Date().toISOString().split('T')[0],
-      currency: result.data.currency || 'USD',
+      storeName: result.data.storeName || "Unknown Store",
+      date: result.data.date || new Date().toISOString().split("T")[0],
+      currency: result.data.currency || "USD",
       confidence: result.data.confidence,
+      text: result.data.fullText || "", // Add the full text for duplicate detection
       processedAt: result.data.processedAt,
       isCVS: result.data.isCVS || false,
       isCVSEligible: result.data.isCVSEligible || false,
       basePoints: result.data.basePoints || 0,
       finalPoints: result.data.finalPoints || 0,
-      pointsMultiplier: result.data.pointsMultiplier || 1
+      pointsMultiplier: result.data.pointsMultiplier || 1,
     };
-    
   } catch (error) {
-    console.error('Error processing receipt:', error);
-    
+    console.error("Error processing receipt:", error);
+
     // Provide user-friendly error messages
-    if (error.code === 'unauthenticated') {
-      throw new Error('Please log in to process receipts');
-    } else if (error.code === 'failed-precondition') {
-      throw new Error('Receipt processing is not configured. Contact administrator.');
+    if (error.code === "unauthenticated") {
+      throw new Error("Please log in to process receipts");
+    } else if (error.code === "failed-precondition") {
+      throw new Error(
+        "Receipt processing is not configured. Contact administrator."
+      );
     } else {
       throw new Error(`Failed to process receipt: ${error.message}`);
     }
@@ -69,15 +71,15 @@ function fileToBase64(file) {
  */
 export function validateReceiptImage(file) {
   // Check file type
-  if (!file.type.startsWith('image/')) {
-    throw new Error('File must be an image');
+  if (!file.type.startsWith("image/")) {
+    throw new Error("File must be an image");
   }
-  
+
   // Check file size (max 10MB)
   if (file.size > 10 * 1024 * 1024) {
-    throw new Error('Image file too large. Maximum size is 10MB');
+    throw new Error("Image file too large. Maximum size is 10MB");
   }
-  
+
   return true;
 }
 
@@ -88,11 +90,11 @@ export function validateReceiptImage(file) {
  */
 export async function verifyReceipt(receiptId) {
   try {
-    const verifyReceiptFn = httpsCallable(functions, 'verifyReceipt');
+    const verifyReceiptFn = httpsCallable(functions, "verifyReceipt");
     const result = await verifyReceiptFn({ receiptId });
     return result.data;
   } catch (error) {
-    console.error('Error verifying receipt:', error);
+    console.error("Error verifying receipt:", error);
     throw new Error(`Failed to verify receipt: ${error.message}`);
   }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, where, orderBy, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, addDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { checkExpiredCompetitions } from '../utils/winnerDetection';
 
@@ -32,14 +32,38 @@ function GroupCompetitions() {
     // Check for expired competitions when component loads
     checkExpiredCompetitions();
     
+    // Set up real-time listener for competitions
+    const competitionsQuery = query(
+      collection(db, 'competitions'),
+      where('groupName', '==', groupName)
+    );
+    
+    const unsubscribe = onSnapshot(competitionsQuery, (snapshot) => {
+      const comps = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Sort by creation date
+      comps.sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0);
+        const dateB = new Date(b.createdAt || 0);
+        return dateB - dateA;
+      });
+      
+      setCompetitions(comps);
+      setLoading(false);
+    });
+    
     // Set up a timer to check for expired competitions every 30 seconds
     const interval = setInterval(async () => {
       await checkExpiredCompetitions();
-      // Reload competitions to show updated winner info
-      loadCompetitions();
     }, 30000);
     
-    return () => clearInterval(interval);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, [groupName]);
 
   useEffect(() => {
