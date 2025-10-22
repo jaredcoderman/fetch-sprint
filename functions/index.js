@@ -29,10 +29,8 @@ function getOpenAI() {
 exports.processReceipt = onCall(
   { secrets: ['OPENAI_API_KEY'] },
   async (request) => {
-  // Verify user is authenticated
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be logged in to process receipts');
-  }
+  // Allow anonymous users to process receipts
+  const userId = request.auth ? request.auth.uid : 'anonymous';
 
   const { imageBase64 } = request.data;
 
@@ -41,7 +39,7 @@ exports.processReceipt = onCall(
   }
 
   try {
-    console.log('Processing receipt for user:', request.auth.uid);
+    console.log('Processing receipt for user:', userId);
 
     // Check if OpenAI API key is configured
     const openaiClient = getOpenAI();
@@ -114,6 +112,31 @@ Include all readable text from the receipt in the fullText field.`
       throw new Error('Receipt image is too unclear to read accurately');
     }
 
+    // Check if it's a CVS receipt and if we're before the deadline
+    const isCVS = data.storeName && (
+      data.storeName.toLowerCase().includes('cvs') ||
+      data.storeName.toLowerCase().includes('cvs pharmacy') ||
+      data.storeName.toLowerCase().includes('cvs health') ||
+      data.storeName.toLowerCase().includes('cvs caremark') ||
+      data.storeName.toLowerCase().includes('cvs minuteclinic') ||
+      data.storeName.toLowerCase().includes('cvs.com') ||
+      data.storeName.toLowerCase().includes('cvs/pharmacy') ||
+      data.storeName.toLowerCase().includes('cvs/health') ||
+      data.storeName.toLowerCase().includes('cvs care') ||
+      data.storeName.toLowerCase().includes('cvs store') ||
+      data.storeName.toLowerCase().includes('cvs retail') ||
+      data.storeName.toLowerCase().includes('cvs/pharmacy') ||
+      data.storeName.toLowerCase().includes('cvs/health') ||
+      data.storeName.toLowerCase().includes('cvs/caremark')
+    );
+    
+    const isBeforeDeadline = new Date() <= new Date('2025-10-24T23:59:59Z');
+    const isCVSEligible = isCVS && isBeforeDeadline;
+    
+    // Calculate points (double for CVS before deadline)
+    const basePoints = Math.round(data.total * 1000);
+    const finalPoints = isCVSEligible ? basePoints * 2 : basePoints;
+
     // Return the processed data
     return {
       amount: data.total,
@@ -122,7 +145,12 @@ Include all readable text from the receipt in the fullText field.`
       currency: data.currency || 'USD',
       confidence: data.confidence,
       fullText: data.fullText || '',
-      processedAt: new Date().toISOString()
+      processedAt: new Date().toISOString(),
+      isCVS: isCVS,
+      isCVSEligible: isCVSEligible,
+      basePoints: basePoints,
+      finalPoints: finalPoints,
+      pointsMultiplier: isCVSEligible ? 2 : 1
     };
 
   } catch (error) {

@@ -1,24 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase';
+import ProfilePicture from '../components/ProfilePicture';
+import { checkExpiredCompetitions } from '../utils/winnerDetection';
 
 function CompetitionDetail() {
   const { id } = useParams();
-  const { currentUser } = useAuth();
   const navigate = useNavigate();
   
   const [competition, setCompetition] = useState(null);
   const [teams, setTeams] = useState([]);
-  const [userTeam, setUserTeam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
+  const [showJoinTeam, setShowJoinTeam] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [newTeamName, setNewTeamName] = useState('');
+  const [userProfile, setUserProfile] = useState(null);
+  const [joinedTeamId, setJoinedTeamId] = useState(null);
+  const [isUserInTeam, setIsUserInTeam] = useState(false);
 
   useEffect(() => {
+    loadUserProfile();
     loadCompetitionData();
+    // Check for expired competitions when component loads
+    checkExpiredCompetitions();
   }, [id]);
+
+  useEffect(() => {
+    if (userProfile) {
+      checkIfUserInTeam();
+    }
+  }, [userProfile, teams]);
+
+  function loadUserProfile() {
+    const savedProfile = localStorage.getItem('userProfile');
+    if (savedProfile) {
+      setUserProfile(JSON.parse(savedProfile));
+    }
+  }
+
+  async function checkIfUserInTeam() {
+    if (!userProfile?.email) return;
+    
+    try {
+      // Check if user is already in any team for this competition
+      const teamsQuery = query(
+        collection(db, 'teams'), 
+        where('competitionId', '==', id),
+        where('memberEmails', 'array-contains', userProfile.email)
+      );
+      const teamsSnapshot = await getDocs(teamsQuery);
+      setIsUserInTeam(!teamsSnapshot.empty);
+    } catch (error) {
+      console.error('Error checking if user is in team:', error);
+      setIsUserInTeam(false);
+    }
+  }
 
   async function loadCompetitionData() {
     try {
@@ -36,10 +74,6 @@ function CompetitionDetail() {
         ...doc.data()
       }));
       setTeams(teamsData);
-
-      // Check if user is in a team
-      const userTeamData = teamsData.find(team => team.members?.includes(currentUser?.uid));
-      setUserTeam(userTeamData);
     } catch (err) {
       console.error('Error loading competition:', err);
     }
@@ -47,28 +81,37 @@ function CompetitionDetail() {
   }
 
   async function handleCreateTeam() {
-    if (!newTeamName.trim()) return;
+    if (!newTeamName.trim()) {
+      alert('Please enter a team name');
+      return;
+    }
+
+    if (isUserInTeam) {
+      alert('You are already part of a team in this competition. You cannot create another team.');
+      return;
+    }
     
     try {
       const teamData = {
         name: newTeamName,
         competitionId: id,
-        members: [currentUser.uid],
-        memberEmails: [currentUser.email],
+        members: [], // Start with empty members
+        memberEmails: [],
+        memberNames: [],
         totalPoints: 0,
         receiptsCount: 0,
         createdAt: new Date().toISOString(),
-        createdBy: currentUser.uid
+        createdBy: 'anonymous'
       };
 
       const teamRef = await addDoc(collection(db, 'teams'), teamData);
       
       // Update competition team count
       await updateDoc(doc(db, 'competitions', id), {
-        teamCount: (competition.teamCount || 0) + 1,
-        participantCount: (competition.participantCount || 0) + 1
+        teamCount: (competition.teamCount || 0) + 1
       });
 
+      alert(`Team "${newTeamName}" created successfully! You can now join it or let others join.`);
       setShowCreateTeam(false);
       setNewTeamName('');
       loadCompetitionData();
@@ -78,16 +121,45 @@ function CompetitionDetail() {
     }
   }
 
-  async function handleJoinTeam(teamId) {
-    if (!currentUser) {
-      navigate('/login');
+  function handleJoinTeamClick(teamId) {
+    if (!userProfile) {
+      alert('Please create your profile first by clicking "Get Started" on the homepage. You can choose to save your profile for convenience.');
+      navigate('/profile');
+      return;
+    }
+    setSelectedTeamId(teamId);
+    setShowJoinTeam(true);
+  }
+
+  async function handleJoinTeam() {
+    if (!userProfile) {
+      alert('Please create your profile first.');
+      navigate('/profile');
       return;
     }
 
     try {
-      await updateDoc(doc(db, 'teams', teamId), {
-        members: arrayUnion(currentUser.uid),
-        memberEmails: arrayUnion(currentUser.email)
+      // Check if email is already in any team in this competition
+      const userAlreadyInTeam = teams.find(team => 
+        team.memberEmails && team.memberEmails.includes(userProfile.email)
+      );
+      
+      if (userAlreadyInTeam) {
+        alert(`You are already a member of the "${userAlreadyInTeam.name}" team. You can only join one team per competition.`);
+        return;
+      }
+
+      // Check if email is already in the specific team they're trying to join
+      const teamToJoin = teams.find(team => team.id === selectedTeamId);
+      if (teamToJoin && teamToJoin.memberEmails && teamToJoin.memberEmails.includes(userProfile.email)) {
+        alert('This email is already in the team. Please use a different email address.');
+        return;
+      }
+
+      await updateDoc(doc(db, 'teams', selectedTeamId), {
+        members: arrayUnion(userProfile.email),
+        memberEmails: arrayUnion(userProfile.email),
+        memberNames: arrayUnion(userProfile.name)
       });
 
       // Update competition participant count
@@ -95,6 +167,10 @@ function CompetitionDetail() {
         participantCount: (competition.participantCount || 0) + 1
       });
 
+      alert(`Successfully joined team!`);
+      setJoinedTeamId(selectedTeamId);
+      setShowJoinTeam(false);
+      setSelectedTeamId(null);
       loadCompetitionData();
     } catch (err) {
       console.error('Error joining team:', err);
@@ -104,9 +180,9 @@ function CompetitionDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-yellow-100 to-blue-200 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500"></div>
           <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
@@ -115,11 +191,22 @@ function CompetitionDetail() {
 
   if (!competition) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-yellow-100 to-blue-200 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Competition Not Found</h2>
-          <button onClick={() => navigate('/competitions')} className="text-indigo-600 hover:text-indigo-700">
-            ← Back to Competitions
+          <button 
+            onClick={() => {
+              if (competition?.schoolName) {
+                navigate(`/school/${encodeURIComponent(competition.schoolName)}`);
+              } else if (competition?.groupName) {
+                navigate(`/group/${encodeURIComponent(competition.groupName)}`);
+              } else {
+                navigate('/');
+              }
+            }}
+            className="text-yellow-700 hover:text-yellow-800"
+          >
+            ← Back to {competition?.schoolName || competition?.groupName || 'Home'}
           </button>
         </div>
       </div>
@@ -127,15 +214,30 @@ function CompetitionDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-blue-shiny-gradient">
       {/* Header */}
       <div className="bg-white shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <button onClick={() => navigate('/competitions')} className="text-indigo-600 hover:text-indigo-700 font-medium">
-            ← Back
-          </button>
-          <h1 className="text-2xl font-bold text-indigo-600">Receipt Sprint</h1>
-          <div className="w-20"></div>
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center">
+          <div className="flex-1">
+            <button 
+              onClick={() => {
+                if (competition?.schoolName) {
+                  navigate(`/school/${encodeURIComponent(competition.schoolName)}`);
+                } else if (competition?.groupName) {
+                  navigate(`/group/${encodeURIComponent(competition.groupName)}`);
+                } else {
+                  navigate('/');
+                }
+              }}
+              className="text-yellow-700 hover:text-yellow-800 font-medium"
+            >
+              ← Back to {competition?.schoolName || competition?.groupName || 'Home'}
+            </button>
+          </div>
+          <div className="flex-1 text-center">
+            <h1 className="text-2xl font-bold text-yellow-700">ReceiptRoyale</h1>
+          </div>
+          <div className="flex-1"></div>
         </div>
       </div>
 
@@ -148,7 +250,6 @@ function CompetitionDetail() {
                 <span className="text-5xl">{competition.emoji || '🏆'}</span>
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">{competition.name}</h1>
-                  <p className="text-gray-600 mt-1">{competition.description}</p>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-6 mt-6">
@@ -164,78 +265,163 @@ function CompetitionDetail() {
                 </div>
                 <div>
                   <p className="text-gray-500 text-sm">Status</p>
-                  <span className="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium mt-1">
-                    Active
-                  </span>
+                  {(() => {
+                    const hasGoal = competition.hasGoal !== false; // Default to true for backward compatibility
+                    const goal = hasGoal ? (competition.goal || 50000) : null;
+                    const endPassed = competition.endDate ? new Date(competition.endDate) <= new Date() : false;
+                    const effectivelyCompleted = competition.status === 'completed' && (
+                      (hasGoal && (competition.winnerPoints || 0) >= goal) || 
+                      (!hasGoal && endPassed) || 
+                      endPassed
+                    );
+                    const label = effectivelyCompleted ? 'Completed' : 'Active';
+                    const classes = effectivelyCompleted ? 'bg-gray-100 text-gray-700' : 'bg-green-100 text-green-700';
+                    return (
+                      <span className={`inline-block ${classes} px-3 py-1 rounded-full text-sm font-medium mt-1`}>
+                        {label}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* User's Team Status */}
-        {userTeam ? (
-          <div className="bg-indigo-600 text-white rounded-xl shadow-lg p-6 mb-8">
+        {/* Leader Banner */}
+        {teams.length > 0 && (
+          <div className="bg-gold text-white rounded-xl shadow-lg p-6 mb-8">
+            <div className="text-center">
+              <h3 className="text-2xl font-bold mb-1">Holding the Crown 👑 :</h3>
+              <p className="text-xl">
+                <strong>{teams.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0))[0].name}</strong> with <strong>{(teams.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0))[0].totalPoints || 0).toLocaleString()}</strong> points
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Success Message After Joining Team */}
+        {joinedTeamId && (
+          <div className="bg-white border-2 border-gray-300 rounded-xl p-6 mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-indigo-200 mb-1">You're on Team</p>
-                <h3 className="text-2xl font-bold">{userTeam.name}</h3>
-                <p className="text-indigo-200 mt-2">
-                  {userTeam.members?.length || 0} members • {userTeam.totalPoints || 0} points
-                </p>
+                <h3 className="text-lg font-semibold text-black mb-2">🎉 Successfully Joined Team!</h3>
+                <p className="text-black">You can now access your team dashboard to start uploading receipts and earning points.</p>
               </div>
               <button
-                onClick={() => navigate(`/team/${userTeam.id}`)}
-                className="bg-white text-indigo-600 px-6 py-3 rounded-lg font-semibold hover:bg-indigo-50 transition-colors"
+                onClick={() => navigate(`/team/${joinedTeamId}`)}
+                className="bg-blue-shiny text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-shiny transition-colors"
               >
                 View Team Dashboard
               </button>
             </div>
           </div>
-        ) : (
-          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6 mb-8">
-            <p className="text-yellow-800 font-medium">
-              ⚠️ You haven't joined a team yet. Create or join a team to start competing!
-            </p>
-          </div>
         )}
 
         {/* Teams List */}
         <div className="mb-6 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">Teams</h2>
-          {!userTeam && (
+          <h2 className="text-2xl font-bold text-white">Teams</h2>
+          {userProfile ? (
+            isUserInTeam ? (
+              <div className="bg-gray-500 text-white px-6 py-2 rounded-lg font-semibold cursor-not-allowed">
+                Already in a Team
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowCreateTeam(true)}
+                className="bg-gold text-white px-6 py-2 rounded-lg font-semibold hover:bg-gold transition-colors"
+              >
+                + Create Team
+              </button>
+            )
+          ) : (
             <button
-              onClick={() => setShowCreateTeam(true)}
-              className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+              onClick={() => navigate('/profile')}
+              className="bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-700 transition-colors"
             >
-              + Create Team
+              Create Profile First
             </button>
           )}
         </div>
 
         {/* Create Team Modal */}
-        {showCreateTeam && (
+        {showCreateTeam && userProfile && !isUserInTeam && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
             <div className="bg-white rounded-xl p-8 max-w-md w-full">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">Create New Team</h3>
-              <input
-                type="text"
-                value={newTeamName}
-                onChange={(e) => setNewTeamName(e.target.value)}
-                placeholder="Enter team name"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none mb-4"
-              />
-              <div className="flex gap-3">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Team Name</label>
+                  <input
+                    type="text"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    placeholder="Enter team name"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none"
+                  />
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Note:</strong> You can create a team with just a name. People can join later using their profiles.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
                 <button
                   onClick={handleCreateTeam}
-                  className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                  className="flex-1 bg-gold text-white py-3 rounded-lg font-semibold hover:bg-gold transition-colors"
                 >
-                  Create
+                  Create Team
                 </button>
                 <button
                   onClick={() => {
                     setShowCreateTeam(false);
                     setNewTeamName('');
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Join Team Modal */}
+        {showJoinTeam && userProfile && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-xl p-8 max-w-md w-full">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">Join Team</h3>
+              <div className="space-y-4">
+                <div className="text-center">
+                  <ProfilePicture
+                    profilePictureUrl={userProfile.profilePictureUrl}
+                    name={userProfile.name}
+                    size="lg"
+                    className="mx-auto mb-4"
+                    showBorder={true}
+                  />
+                  <h4 className="text-lg font-semibold text-gray-900">{userProfile.name}</h4>
+                  <p className="text-gray-600">{userProfile.email}</p>
+                  <p className="text-sm text-gray-500">{userProfile.schoolName}</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Ready to join!</strong> Click "Join Team" to add yourself to this team using your profile information.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleJoinTeam}
+                  className="flex-1 bg-blue-shiny text-white py-3 rounded-lg font-semibold hover:bg-blue-shiny transition-colors"
+                >
+                  Join Team
+                </button>
+                <button
+                  onClick={() => {
+                    setShowJoinTeam(false);
+                    setSelectedTeamId(null);
                   }}
                   className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
                 >
@@ -259,7 +445,6 @@ function CompetitionDetail() {
               <div key={team.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-900">{team.name}</h3>
-                  <span className="text-2xl">🎯</span>
                 </div>
                 
                 <div className="space-y-2 mb-4">
@@ -269,7 +454,7 @@ function CompetitionDetail() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Total Points:</span>
-                    <span className="font-semibold text-indigo-600">{team.totalPoints || 0}</span>
+                    <span className="font-semibold text-yellow-700">{(team.totalPoints || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Receipts:</span>
@@ -277,26 +462,26 @@ function CompetitionDetail() {
                   </div>
                 </div>
 
-                {userTeam?.id === team.id ? (
+                {joinedTeamId === team.id ? (
                   <button
                     onClick={() => navigate(`/team/${team.id}`)}
-                    className="w-full bg-indigo-100 text-indigo-700 py-2 rounded-lg font-semibold"
+                    className="w-full bg-gold text-white py-2 rounded-lg font-semibold hover:bg-gold transition-all duration-300"
                   >
-                    Your Team
+                    View Team Dashboard
                   </button>
-                ) : !userTeam ? (
+                ) : (userProfile && userProfile.email && team.memberEmails && team.memberEmails.includes(userProfile.email)) ? (
                   <button
-                    onClick={() => handleJoinTeam(team.id)}
-                    className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                    onClick={() => navigate(`/team/${team.id}`)}
+                    className="w-full bg-gold text-white py-2 rounded-lg font-semibold hover:bg-gold transition-all duration-300"
                   >
-                    Join Team
+                    View Team Dashboard
                   </button>
                 ) : (
                   <button
-                    disabled
-                    className="w-full bg-gray-200 text-gray-500 py-2 rounded-lg font-semibold cursor-not-allowed"
+                    onClick={() => handleJoinTeamClick(team.id)}
+                    className="w-full bg-blue-shiny text-white py-2 rounded-lg font-semibold hover:bg-blue-shiny transition-colors"
                   >
-                    Already on a Team
+                    Join Team
                   </button>
                 )}
               </div>
@@ -322,7 +507,7 @@ function CompetitionDetail() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-indigo-600">{team.totalPoints || 0}</p>
+                      <p className="text-2xl font-bold text-yellow-700">{(team.totalPoints || 0).toLocaleString()}</p>
                       <p className="text-sm text-gray-500">points</p>
                     </div>
                   </div>

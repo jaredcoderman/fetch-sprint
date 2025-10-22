@@ -26,7 +26,12 @@ export async function processReceiptImage(imageFile) {
       date: result.data.date || new Date().toISOString().split('T')[0],
       currency: result.data.currency || 'USD',
       confidence: result.data.confidence,
-      processedAt: result.data.processedAt
+      processedAt: result.data.processedAt,
+      isCVS: result.data.isCVS || false,
+      isCVSEligible: result.data.isCVSEligible || false,
+      basePoints: result.data.basePoints || 0,
+      finalPoints: result.data.finalPoints || 0,
+      pointsMultiplier: result.data.pointsMultiplier || 1
     };
     
   } catch (error) {

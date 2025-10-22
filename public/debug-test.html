@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Debug Test</title>
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyAerliEUGtJ4aKPWQvJma4NIbJWxensu1M",
+            authDomain: "receipt-sprint.firebaseapp.com",
+            projectId: "receipt-sprint",
+            storageBucket: "receipt-sprint.firebasestorage.app",
+            messagingSenderId: "358446206895",
+            appId: "1:358446206895:web:458164f20bfcd61a59295a",
+            measurementId: "G-DF5P72EFFY"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function testFirestore() {
+            console.log('🧪 Testing Firestore connection...');
+            
+            try {
+                // Test reading from schools collection
+                console.log('1️⃣ Testing schools collection...');
+                const schoolsSnapshot = await getDocs(collection(db, 'schools'));
+                console.log(`✅ Schools: ${schoolsSnapshot.size} documents`);
+                
+                // Test reading from universities collection
+                console.log('2️⃣ Testing universities collection...');
+                const universitiesSnapshot = await getDocs(collection(db, 'universities'));
+                console.log(`✅ Universities: ${universitiesSnapshot.size} documents`);
+                
+                document.getElementById('result').innerHTML = `
+                    <div style="color: green; padding: 20px; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px;">
+                        <h3>✅ Firebase Connection Successful!</h3>
+                        <p>Schools: ${schoolsSnapshot.size} documents</p>
+                        <p>Universities: ${universitiesSnapshot.size} documents</p>
+                        <p>Check the browser console for detailed logs.</p>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('❌ Firebase test failed:', error);
+                document.getElementById('result').innerHTML = `
+                    <div style="color: red; padding: 20px; background: #fef2f2; border: 1px solid #ef4444; border-radius: 8px;">
+                        <h3>❌ Firebase Connection Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p><strong>Code:</strong> ${error.code || 'Unknown'}</p>
+                        <p>Check the browser console for more details.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Run test when page loads
+        window.addEventListener('load', testFirestore);
+    </script>
+</head>
+<body>
+    <div style="max-width: 800px; margin: 50px auto; padding: 20px; font-family: Arial, sans-serif;">
+        <h1>Firebase Debug Test</h1>
+        <p>This page tests the Firebase connection directly. Check the browser console for detailed logs.</p>
+        
+        <div id="result">
+            <div style="padding: 20px; background: #f3f4f6; border-radius: 8px;">
+                <p>🔄 Testing Firebase connection...</p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 20px; background: #f9fafb; border-radius: 8px;">
+            <h3>Instructions:</h3>
+            <ol>
+                <li>Open your browser's Developer Tools (F12)</li>
+                <li>Go to the Console tab</li>
+                <li>Look for the test results above</li>
+                <li>Check for any error messages in the console</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,100 +1,105 @@
 import React from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
-import Login from './pages/Login'
-import Competitions from './pages/Competitions'
+import SchoolEntry from './pages/SchoolEntry'
+import SchoolCompetitions from './pages/SchoolCompetitions'
+import GroupCompetitions from './pages/GroupCompetitions'
 import CompetitionDetail from './pages/CompetitionDetail'
 import TeamDashboard from './pages/TeamDashboard'
 import CreateCompetition from './pages/CreateCompetition'
+import UserProfile from './pages/UserProfile'
 
 function LandingPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-white">
       {/* Landing Page */}
       <div className="max-w-6xl mx-auto px-4 py-12">
         {/* Hero Section */}
-        <div className="text-center py-20 max-w-6xl mx-auto">
-          <h1 className="text-6xl font-bold text-gray-900 mb-8 w-full">
-            Receipt Sprint
+        <div className="text-center py-24 max-w-6xl mx-auto">
+          <h1 className="text-6xl font-bold text-blue-800 mb-10 w-full">
+            ReceiptRoyale
           </h1>
           <div className="flex flex-col items-center w-full mt-8">
-            <p className="text-2xl text-gray-600 mb-6 max-w-2xl w-full text-center">
-              Compete with your team, scan receipts, and win prizes!
+            <p className="text-2xl text-black mb-8 max-w-2xl w-full text-center">
+              Compete with your team, scan receipts, and win!
             </p>
-            <p className="text-lg text-gray-500 mb-12 max-w-3xl w-full text-center leading-relaxed">
+            <p className="text-lg text-black mb-16 max-w-3xl w-full text-center leading-relaxed">
               Join exciting competitions, form teams with friends, scan your shopping receipts, 
-              and earn points based on your purchases. The team with the most points wins!
+              and earn points based on your purchases. First team to reach 50,000 points wins!
             </p>
           </div>
           
-          <div className="flex gap-4 justify-center mt-8">
+          <div className="flex gap-4 justify-center mt-10">
             <button 
-              onClick={() => navigate('/login')}
-              className="bg-indigo-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-indigo-700 transition-colors shadow-lg hover:shadow-xl"
+              onClick={() => navigate('/profile')}
+              className="bg-gold text-white px-8 py-4 rounded-lg text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
             >
               Get Started
-            </button>
-            <button 
-              onClick={() => navigate('/competitions')}
-              className="bg-white text-indigo-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-50 transition-colors shadow-lg hover:shadow-xl border-2 border-indigo-600"
-            >
-              View Competitions
             </button>
           </div>
         </div>
 
+
         {/* How It Works Section */}
-        <div className="mt-24">
+        <div className="mt-8">
           <h2 className="text-4xl font-bold text-center text-gray-900 mb-16 pb-12">
             How It Works
           </h2>
           <div className="grid md:grid-cols-4 gap-8">
-            <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="bg-white p-8 rounded-xl shadow-lg text-center border-l-4 border-yellow-500 hover:shadow-xl transition-shadow">
+              <div className="w-16 h-16 bg-gold rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">🏆</span>
               </div>
-              <h3 className="text-xl font-semibold mb-3">Find Competition</h3>
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">Find Competition</h3>
               <p className="text-gray-600">
                 Browse active competitions and choose one to join
               </p>
             </div>
 
-            <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="bg-white p-8 rounded-xl shadow-lg text-center border-l-4 border-blue-400 hover:shadow-xl transition-shadow">
+              <div className="w-16 h-16 bg-blue-300 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">👥</span>
               </div>
-              <h3 className="text-xl font-semibold mb-3">Join a Team</h3>
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">Join a Team</h3>
               <p className="text-gray-600">
                 Create or join a team to compete together
               </p>
             </div>
 
-            <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="bg-white p-8 rounded-xl shadow-lg text-center border-l-4 border-yellow-500 hover:shadow-xl transition-shadow">
+              <div className="w-16 h-16 bg-gold rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">🧾</span>
               </div>
-              <h3 className="text-xl font-semibold mb-3">Scan Receipts</h3>
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">Scan Receipts</h3>
               <p className="text-gray-600">
                 Upload your shopping receipts to earn points
               </p>
             </div>
 
-            <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="bg-white p-8 rounded-xl shadow-lg text-center border-l-4 border-blue-400 hover:shadow-xl transition-shadow">
+              <div className="w-16 h-16 bg-blue-300 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">🎉</span>
               </div>
-              <h3 className="text-xl font-semibold mb-3">Win Prizes</h3>
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">Win</h3>
               <p className="text-gray-600">
-                Team with most points wins the competition!
+                First team to reach 50,000 points wins the competition!
               </p>
             </div>
           </div>
         </div>
 
+        {/* Goal Callout */}
+        <div className="mt-12 bg-gold-gradient rounded-2xl shadow-xl p-12 text-center text-white">
+          <h2 className="text-4xl font-bold mb-6">🎯 Competition Goal</h2>
+          <p className="text-2xl mb-3">First team to reach</p>
+          <p className="text-5xl font-bold mb-6">50,000 Points</p>
+          <p className="text-xl opacity-90 mb-4">wins the competition!</p>
+          <p className="text-base mt-6 opacity-75">($1 = 1,000 points • $50 in receipts = 50,000 points)</p>
+        </div>
+
         {/* Features Section */}
-        <div className="mt-24 bg-white rounded-2xl shadow-xl p-12">
+        <div className="mt-12 bg-white rounded-2xl shadow-xl p-12">
           <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">
             Features
           </h2>
@@ -144,16 +149,17 @@ function LandingPage() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/competitions" element={<Competitions />} />
-        <Route path="/competition/:id" element={<CompetitionDetail />} />
-        <Route path="/team/:id" element={<TeamDashboard />} />
-        <Route path="/create-competition" element={<CreateCompetition />} />
-      </Routes>
-    </AuthProvider>
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/profile" element={<UserProfile />} />
+      <Route path="/school" element={<SchoolEntry />} />
+      <Route path="/school/:schoolName" element={<SchoolCompetitions />} />
+      <Route path="/group/:groupName" element={<GroupCompetitions />} />
+      <Route path="/competition/:id" element={<CompetitionDetail />} />
+      <Route path="/team/:id" element={<TeamDashboard />} />
+      <Route path="/create-competition/:schoolName" element={<CreateCompetition />} />
+      <Route path="/create-competition" element={<CreateCompetition />} />
+    </Routes>
   )
 }
 

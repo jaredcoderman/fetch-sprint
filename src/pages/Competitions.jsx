@@ -42,7 +42,7 @@ function Competitions() {
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-indigo-600">Receipt Sprint</h1>
+          <h1 className="text-2xl font-bold text-indigo-600">ReceiptRoyale</h1>
           <div className="flex items-center gap-4">
             <span className="text-gray-600">{currentUser?.email}</span>
             <button
@@ -91,11 +91,14 @@ function Competitions() {
                   </span>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">{comp.name}</h3>
-                <p className="text-gray-600 mb-4">{comp.description}</p>
+                {/* Temporarily disabled description to debug the "1" issue */}
+                {/* {comp.description && comp.description.trim() && comp.description.length > 1 && comp.description !== '1' && (
+                  <p className="text-gray-600 mb-4">{comp.description}</p>
+                )} */}
                 <div className="space-y-2 mb-4 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Teams:</span>
-                    <span className="font-semibold">{comp.teamCount || 0}</span>
+                    <span className="text-white">Teams:</span>
+                    <span className="font-semibold">{String(comp.teamCount || 0)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Participants:</span>
@@ -105,10 +108,47 @@ function Competitions() {
                     <span className="text-gray-500">Ends:</span>
                     <span className="font-semibold">{comp.endDate || 'TBA'}</span>
                   </div>
+                  {comp.hasGoal !== false && comp.goal && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Goal:</span>
+                      <span className="font-semibold">{comp.goal.toLocaleString()} points</span>
+                    </div>
+                  )}
+                  {comp.hasGoal === false && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Goal:</span>
+                      <span className="font-semibold">Highest points wins</span>
+                    </div>
+                  )}
+                  {comp.status === 'completed' && comp.winnerTeamName && (() => {
+                    const hasGoal = comp.hasGoal !== false; // Default to true for backward compatibility
+                    const goal = hasGoal ? (comp.goal || 50000) : null;
+                    const endPassed = comp.endDate ? new Date(comp.endDate) <= new Date() : false;
+                    const reachedGoal = hasGoal && (comp.winnerPoints || 0) >= goal;
+                    const effectivelyCompleted = reachedGoal || endPassed;
+
+                    if (!effectivelyCompleted) return null; // Hide banner if not truly completed
+
+                    return (
+                      <div className="bg-gold-light border border-gold rounded-lg p-2 mt-2">
+                        <p className="text-yellow-800 text-sm font-semibold text-center">
+                          🏆 {
+                            reachedGoal
+                              ? (comp.isTied && comp.tiedTeamNames && comp.tiedTeamNames.length > 1 ? 
+                                  `${comp.tiedTeamNames.join(', ')} tied for first place!` :
+                                  `${comp.winnerTeamName} won the competition!`)
+                              : (comp.isTied && comp.tiedTeamNames && comp.tiedTeamNames.length > 1 ? 
+                                  `No one won! ${comp.tiedTeamNames.join(', ')} tied for closest with ${comp.winnerPoints.toLocaleString()} points.` :
+                                  `No one won! ${comp.winnerTeamName} was the closest with ${comp.winnerPoints.toLocaleString()} points.`)
+                          }
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <button
                   onClick={() => navigate(`/competition/${comp.id}`)}
-                  className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                  className="w-full bg-blue-shiny text-white py-2 rounded-lg font-semibold hover:bg-blue-shiny transition-colors"
                 >
                   View Details
                 </button>
